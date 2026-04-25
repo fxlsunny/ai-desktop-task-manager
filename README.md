@@ -28,333 +28,299 @@
 - 始终置顶显示，可拖拽到屏幕任意位置
 - **透明度可调**（20% ~ 100%），不干扰工作
 - **一键折叠**，只保留顶栏标题条
-- 多任务按优先级颜色分级显示（紧急🔴/高🟠/中🟡/低🟢）
-- 支持快速勾选完成状态、实时更新进度百分比
+- 可选系统托盘图标（依赖 `pystray`，已自动降级）
+- 开机自启动（写入注册表，一键开关）
 
-### 📋 任务管理
-| 字段 | 说明 |
-|------|------|
-| 任务标题 | 必填，显示在悬浮窗上 |
-| 任务内容 | 支持 **Markdown 语法** + 内嵌图片 |
-| 目标 | 本次任务期望达成的结果 |
-| 问题/障碍 | 遇到的阻塞点备注 |
-| 优先级 | 低 / 中 / 高 / 紧急（颜色区分） |
-| 状态 | 待办 / 进行中 / 已完成 / 已取消 |
-| 进度 | 0~100% 进度条 |
-| 标签 | 逗号分隔的自由标签 |
-| 提醒时间 | HH:MM 格式，到点弹窗 + 提示音 |
-| 创建/更新时间 | 自动记录，显示耗时天数 |
+### 📝 任务管理
+- 任务支持：**标题 / 内容 / 优先级 / 截止日期 / 闹钟提醒 / 分类标签**
+- 状态：未完成 / 已完成（可只看未完成）
+- 按优先级颜色标记（🔴 高 / 🟡 中 / 🟢 低）
+- 搜索、筛选、排序一应俱全
+- **放大编辑器**：双击任务内容区打开独立窗口（1200×720），左编辑右预览
+  - 支持搜索/替换、字号缩放（Ctrl+滚轮）、快捷键 Ctrl+S/Z/F
+  - **Markdown 预览** 纯 Tk tag 实现（# / ## / **粗体** / *斜体* / `code` / > 引用 / - 列表 / [链接]）
+  - **本地图片预览**：`![alt](relative/path.jpg)` 可直接显示缩略图
 
-### 🤖 AI 智能助手（独立窗口）
-- **三栏布局**：左侧会话历史 / 中间消息区 / 底部输入框
-- **6 大主流模型开箱即用**：
-  | 提供商 | 默认模型 | 说明 |
-  |--------|---------|------|
-  | 🐉 腾讯混元 | `hunyuan-turbos-latest` | 国内首选，中文强 |
-  | ⚡ Groq | `llama3-8b-8192` | **免费**，每天 14400 次 |
-  | 🔵 DeepSeek | `deepseek-chat` | 代码任务友好 |
-  | 🌙 Moonshot | `moonshot-v1-8k` | 长上下文 |
-  | 🤖 OpenAI | `gpt-4o-mini` | 需自备 Key |
-  | 🔧 自定义 | 任意 OpenAI 兼容接口 | 支持自建 / Ollama 转发等 |
-- **Ollama 本地模型**：自动检测 `http://localhost:11434`，支持优先本地
-- **流式输出**：边生成边显示，体验跟 ChatGPT 一致
-- **顶栏一键切换模型**，每个提供商独立保存 API Key
-- **会话历史持久化**：每个会话一个 JSON，`data/chat_history/` 目录
-- **系统 Prompt 自定义**：可根据场景调整 AI 人设
+### 🤖 AI 助手（多模型）
+内置 **7 个主流 AI 服务商** 配置模板，一键切换：
 
-### 📝 Markdown 放大编辑器
-- 双击任务内容 或 点击 `🔍 放大编辑` 打开 **1200×720 编辑窗口**
-- **三种视图模式**：仅编辑 / 分屏 / 仅预览
-- **内置搜索替换**（`Ctrl+F`），支持正则
-- **字号快捷缩放**（`Ctrl+= / Ctrl+-`）
-- 纯 Tk tag 实现的 Markdown 渲染，**零第三方依赖**
-  - 支持 H1-H6 / 粗体 / 斜体 / 代码块 / 有序列表 / 任务列表 / 链接 / 图片
-- **本地图片预览**：`![alt](path)` 语法，相对路径 / 绝对路径均可
+| Provider | 说明 | 费用 |
+|----------|------|------|
+| 🐉 **腾讯混元** | `hunyuan-turbos-latest`，中文优化，内置 DEMO Key 可零配置即用 | 免费额度 |
+| 🟢 **Ollama 本地** | 完全离线运行，默认模型 `qwen2:7b` | 免费（需本地部署） |
+| ⚡ **Groq** | `llama3-8b-8192`，推理极快 | 免费额度较大 |
+| 🔵 **DeepSeek** | `deepseek-chat`，代码能力强 | 低价 |
+| 🌙 **Moonshot** | `moonshot-v1-8k`，长上下文 | 付费 |
+| 🤖 **OpenAI** | `gpt-4o-mini` 等 | 付费 |
+| 🔧 **自定义** | 任意 OpenAI 兼容 API | 取决于服务 |
 
-### 📷 桌面截图 + 标注
-- **两种启动方式**：
-  - 🔥 全局快捷键 `Ctrl+Alt+A`（需安装可选依赖 `keyboard`）
-  - 🖱️ 悬浮窗 / 编辑器内的 `📷` 按钮
-- **区域选择**：全屏半透明遮罩 + 拖拽框选（支持多屏 / 高 DPI）
-- **标注工具**：矩形 / 椭圆 / 箭头 / 画笔 / 文字 / **马赛克**
-  - 颜色盘 + 粗细滑块，`Ctrl+Z/Y` 撤销重做
-- **保存规则**：
-  - 自动按日期归档：`data/img/YYYYMMDD/HHMMSS_<自定义名>.jpg`
-  - JPEG 质量 90，体积友好
-  - 文件名可自定义，实时预览完整路径
-  - 同名自动追加序号
-- **一键插入任务内容**：截图保存后自动以 Markdown 格式插入，预览区直接可见
+**特性**：
+- **SSE 流式输出**：回复逐字打字，支持中途停止
+- **持久化会话**：每次对话自动保存到 `data/chat_history/`
+  - 左侧会话列表可查看/删除/切换，类似 ChatGPT
+- **系统提示词可定制**：在设置中自定义人设
+- **请求透传**：`extra_body` 支持（例如混元的 `enable_enhancement`）
 
-### ⏰ 闹钟 & 提醒
-- 精确到分钟的 Toplevel 弹窗
-- Windows 原生 Beep 提示音（无额外音频文件）
-- 支持 "单次" / "每日循环" 两种模式
+### 📷 桌面截图 & 标注
+- 全屏半透明遮罩 → 拖拽选区 → 进入标注编辑器
+- **标注工具**：矩形、椭圆、箭头、画笔、文字、马赛克
+- 颜色盘 + 粗细滑块、撤销/重做/清空
+- 快捷键：Ctrl+Z/Y（撤销/重做）、Ctrl+S（保存）、Esc（退出）
+- **多屏 + HiDPI 适配**（启动前自动开启 DPI Awareness）
+- **自动插入任务**：截图保存后直接追加到当前编辑的任务内容中
+- **全局热键**：`Ctrl+Alt+A`（需安装 `keyboard` 库）
 
-### 💾 数据管理 & 备份
-- 所有数据本地 JSON 存储，**人类可读、可手改**
-- **设置面板** 可指定 `data_dir` 路径（支持相对/绝对路径）
-- **一键导出**：任务 + 历史对话 + 配置 打包 zip
-- **邮件备份**：配置 SMTP（QQ / 163 / Gmail 均可），跨机器同步
+### ⏰ 闹钟提醒
+- 每分钟精确检测一次（自动对齐系统时钟）
+- 到点弹窗 + 可选声音提醒
+- 支持"提前 N 分钟"
 
-### 🚀 开机自启 & 系统托盘
-- 注册表 `Run` 键一键开启/关闭（无需管理员）
-- 可选 `pystray` 支持系统托盘右下角图标
-- 最小化后自动隐藏到托盘，不占任务栏
+### 💾 备份 / 邮件导出
+- 一键把 `tasks.json` + 对话历史打包为 zip
+- 可选通过 SMTP 邮件发送（默认 QQ 邮箱 465 SSL）
+- 支持主流服务商：QQ/163/126/Gmail/Outlook/新浪/Yahoo 一键选择
+- 可选是否包含 `config.json`（敏感字段自动脱敏）
+
+---
+
+## 🗂️ 项目结构
+
+```
+ai-desktop-task-manager/
+├── src/                         # 所有 Python 源码
+│   ├── main.py                  # ← 程序入口
+│   ├── config.py                # 配置加载/保存
+│   ├── models.py                # 任务数据模型 & Store
+│   ├── overlay.py               # 桌面悬浮窗
+│   ├── manager.py               # 任务管理窗
+│   ├── ai_window.py             # AI 对话窗
+│   ├── ai_chat.py               # AI 后端抽象（OpenAI/Ollama）
+│   ├── chat_history.py          # 对话会话持久化
+│   ├── markdown_editor.py       # 放大编辑器（MD 预览 + 搜索替换）
+│   ├── screenshot.py            # 桌面截图 & 标注
+│   ├── alarm.py                 # 闹钟提醒
+│   ├── backup.py                # 备份 & 邮件导出
+│   └── autostart.py             # 开机自启动（Windows 注册表）
+├── scripts/
+│   ├── 桌面任务管理.bat          # 启动脚本（双击运行）
+│   └── 安装可选依赖.bat          # 一键装 pystray / pillow / keyboard
+├── config/
+│   ├── config.example.json      # 配置模板（入库）
+│   └── config.json              # 本地真实配置（含 Key，.gitignore，首次启动自动生成）
+├── data/                        # 运行数据（.gitignore）
+│   ├── tasks.json               # 任务列表
+│   ├── chat_history/            # AI 会话 JSON
+│   └── img/YYYYMMDD/            # 截图按日期归档
+├── README.md
+├── LICENSE
+└── .gitignore
+```
 
 ---
 
 ## 🚀 快速开始
 
-### 环境要求
-- **Windows 10/11**（Linux/macOS 大部分功能可用，但快捷键和注册表模块需适配）
-- **Python 3.8+**
-- **核心零依赖**，仅用标准库 + Tkinter
+### 1. 环境要求
+- **Python 3.8+**（Windows 系统）
+- 只需 Python 标准库 + Tkinter（Python 自带）即可运行
+- 可选依赖（增强体验，非必须）：
+  - `pystray` + `pillow`：系统托盘图标 & 截图
+  - `keyboard`：全局热键 Ctrl+Alt+A 截图
 
-### 安装运行
+### 2. 克隆 & 启动
+
 ```bash
-# 1. 克隆项目
 git clone https://github.com/fxlsunny/ai-desktop-task-manager.git
 cd ai-desktop-task-manager
-
-# 2. 直接启动
-python main.py
-
-# 或双击启动（后台运行）
-桌面任务管理.bat
 ```
 
-### 安装可选增强（推荐）
+**方式 A：双击 `.bat`（推荐，Windows）**
+
+```
+scripts\桌面任务管理.bat
+```
+
+> 首次启动会自动从 `config/config.example.json` 生成 `config/config.json`，然后退出并提示你填 API Key。  
+> 填好后再次双击即可启动。
+
+**方式 B：命令行**
+
 ```bash
-双击 安装可选依赖.bat
-# 等价于：pip install pillow pystray keyboard
+# 首次使用：复制配置模板
+copy config\config.example.json config\config.json    # Windows
+# cp config/config.example.json config/config.json     # Linux/macOS
+
+# 启动
+pythonw src\main.py
+# 或前台模式（能看日志）
+python src\main.py
 ```
 
-| 可选包 | 启用功能 |
-|--------|---------|
-| `pillow` | 截图标注、Markdown 图片预览 |
-| `pystray` | 系统托盘图标 |
-| `keyboard` | 全局快捷键 `Ctrl+Alt+A` 截图 |
+### 3. 安装可选依赖（可跳过）
+
+```
+scripts\安装可选依赖.bat
+```
+
+或手动：
+```bash
+python -m pip install pystray pillow keyboard
+```
 
 ---
 
-## 🔧 AI 配置
+## ⚙️ AI 模型配置
 
-### 方式 1：界面配置（推荐）
-1. 启动应用 → 悬浮窗点 `📋` 打开任务管理
-2. 切到 **「AI 设置」** Tab
-3. 下拉选择服务商 → 填入 API Key → 保存
-4. 在 AI 助手窗口顶栏即可切换使用
+### 方式 1：修改 `config/config.json`（不会入库）
 
-### 方式 2：直接编辑 `config.json`
-```json
+打开 `config/config.json`，找到 `ai.providers.<你想用的服务商>.api_key`，填入你的 Key：
+
+```jsonc
 {
   "ai": {
-    "active_provider": "hunyuan",
+    "active_provider": "hunyuan",        // 默认使用腾讯混元
     "providers": {
       "hunyuan": {
         "label": "腾讯混元",
-        "api_key": "你的 Key",
+        "api_key": "sk-your-hunyuan-key-here",
         "base_url": "https://api.hunyuan.cloud.tencent.com/v1",
         "model": "hunyuan-turbos-latest"
+      },
+      "deepseek": {
+        "label": "DeepSeek",
+        "api_key": "sk-your-deepseek-key",
+        "base_url": "https://api.deepseek.com/v1",
+        "model": "deepseek-chat"
       }
+      // ... 其它服务商
     }
   }
 }
 ```
 
-### 方式 3：环境变量（避免 Key 落盘）
-```powershell
-$env:HUNYUAN_DEMO_KEY = "你的 Key"
-python main.py
-```
+### 方式 2：在程序 UI 里配置（推荐）
 
-### 🆓 免费 AI 推荐
-| 方案 | 获取方式 |
-|------|---------|
-| **Groq**（推荐）| https://console.groq.com → 注册即送每天 14400 次 |
-| **Ollama 本地** | https://ollama.com 下载 → `ollama run qwen2:7b` |
-| **腾讯混元** | https://console.cloud.tencent.com/hunyuan/api-key |
-| **DeepSeek** | https://platform.deepseek.com/api_keys |
+启动程序 → 点击 `⚙️ 设置` → 切换到 `🤖 AI 配置` → 下拉选择服务商 → 填入 Key → 保存。
+
+### 方式 3：使用本地 Ollama（完全免费离线）
+
+1. 安装 [Ollama](https://ollama.com)，运行 `ollama pull qwen2:7b`
+2. 在 `config/config.json` 里把 `ai.prefer_ollama` 设为 `true`
+3. 启动程序，AI 助手会优先走本地 Ollama
+
+### 🔑 获取 API Key 的渠道
+
+| 模型 | 获取地址 | 备注 |
+|------|---------|------|
+| 腾讯混元 | https://cloud.tencent.com/product/hunyuan | 新用户有免费 Token 额度 |
+| Groq | https://console.groq.com/keys | 免费额度充足，推理极快 |
+| DeepSeek | https://platform.deepseek.com/api_keys | 低价高质量，国内可直连 |
+| Moonshot | https://platform.moonshot.cn/console/api-keys | 新用户赠送额度 |
+| OpenAI | https://platform.openai.com/api-keys | 需海外信用卡 |
 
 ---
 
-## ⌨️ 快捷键一览
+## ⌨️ 快捷键
 
 ### 全局
 | 快捷键 | 功能 |
 |--------|------|
-| `Ctrl + Alt + A` | 桌面截图（需装 keyboard 库） |
+| `Ctrl+Alt+A` | 桌面截图（需 `pip install keyboard`） |
 
-### Markdown 编辑器
+### 放大编辑器（双击任务内容打开）
 | 快捷键 | 功能 |
 |--------|------|
-| `Ctrl + F` | 搜索 |
-| `Ctrl + H` | 替换 |
-| `Ctrl + =` | 字号放大 |
-| `Ctrl + -` | 字号缩小 |
-| `Ctrl + S` | 保存并关闭 |
-| `Esc` | 取消退出 |
+| `Ctrl+S` | 保存 |
+| `Ctrl+Z / Y` | 撤销 / 重做 |
+| `Ctrl+F` | 搜索 |
+| `Ctrl++ / -` | 放大 / 缩小字号 |
+| `Ctrl+滚轮` | 缩放字号 |
+| `Esc` | 关闭 |
 
 ### 截图标注
 | 快捷键 | 功能 |
 |--------|------|
-| `Ctrl + Z` | 撤销 |
-| `Ctrl + Y` | 重做 |
-| `Ctrl + S` | 保存 |
-| `Esc` | 取消截图 |
+| `Ctrl+Z / Y` | 撤销 / 重做 |
+| `Ctrl+S` | 保存并插入 |
+| `Esc` | 取消 |
 
 ---
 
-## 📁 项目结构
+## 🛡️ 隐私与安全
 
-```
-ai-desktop-task-manager/
-├── main.py               # 主入口（悬浮球 + 系统托盘 + 快捷键注册）
-├── config.py             # 配置读写（多 Provider + 相对路径解析）
-├── config.json           # 用户配置（首次运行自动生成）
-├── config.json.example   # 配置示例
-├── models.py             # 任务数据模型 + JSON 持久化
-│
-├── overlay.py            # 半透明悬浮窗（含截图按钮）
-├── manager.py            # 任务管理主窗口（增删改查 / 设置 / AI 配置 / 备份）
-├── markdown_editor.py    # Markdown 放大编辑器（~700 行，实时预览 + 搜索替换）
-├── screenshot.py         # 桌面截图 + 标注编辑器（~700 行）
-│
-├── ai_window.py          # AI 对话窗口（三栏布局 + 模型切换）
-├── ai_chat.py            # AI 后端抽象（Ollama / OpenAI 兼容）
-├── chat_history.py       # 会话历史持久化
-│
-├── alarm.py              # 闹钟弹窗提醒
-├── autostart.py          # 开机自启（注册表 Run 键）
-├── backup.py             # 数据备份（本地 zip / 邮件 SMTP）
-│
-├── 桌面任务管理.bat       # Windows 后台启动脚本
-├── 安装可选依赖.bat       # 安装 pillow/pystray/keyboard
-│
-├── data/                 # 用户数据目录（.gitignore）
-│   ├── tasks.json        # 任务列表
-│   ├── chat_history/     # AI 对话记录（每会话一个 JSON）
-│   └── img/YYYYMMDD/     # 截图归档（按日期）
-│
-└── README.md
-```
+- **所有数据 100% 本地存储**：任务、对话记录、截图都在 `data/` 目录，不会上传到任何云端
+- **API Key 仅用于调用对应 AI 服务商**，程序本身不收集、不上传任何信息
+- **配置文件 `config/config.json` 已加入 `.gitignore`**，不会意外上传到仓库
+- 如要同步任务到其它设备，可用"备份 → 邮件发送"功能手动同步
 
 ---
 
-## 💡 技术亮点
-
-### 🪶 极致轻量
-- **内存 ~20MB**（对比 Electron 类应用动辄 200MB+）
-- **闲置 0% CPU**（纯事件驱动，无轮询）
-- **冷启动 < 0.5s**
-- **核心零依赖**：仅 Python 标准库 + Tkinter（Python 自带）
-
-### 🔌 多 AI 提供商统一抽象
-- `ai_chat.py` 抽象 `AIBackend` 基类
-- `OllamaBackend`（本地）+ `OpenAICompatBackend`（云端通用）
-- 支持 `extra_body` 透传（如混元的 `enable_enhancement: true`）
-- 流式/非流式双模式，自动降级
-
-### 🎨 纯 Tk Markdown 渲染
-- 不引入 `tkhtmlview` / `tkinterweb` 等重型依赖
-- 利用 Text widget 的 tag 配置实现样式
-- 正则分词 + 行级解析，性能足够千行内容实时预览
-- 图片支持 `image_create` + PhotoImage 引用缓存防 GC
-
-### 🖼️ Windows DPI 适配
-- 调用 `ctypes.windll.shcore.SetProcessDpiAwareness(1)`
-- 物理像素 vs 逻辑像素换算，多屏混用不跳位
-- 虚拟屏边界识别，副屏截图正常
-
-### 📦 相对路径 + 可移植
-- `config.json` 中 `data_dir` 支持相对路径
-- `config.py` 中 `_resolve_data_dir()` 统一解析
-- 整个项目目录可随意移动，数据不会丢失
-
----
-
-## 🐛 常见问题
-
-<details>
-<summary><b>Q: 启动后没有悬浮窗？</b></summary>
-
-- 检查是否被防火墙/杀软拦截
-- 看 `config.json` 中 `overlay_visible` 是否为 `true`
-- `overlay_x` / `overlay_y` 是否在屏幕范围内（多屏用户重插拔显示器易出现）
-- 删除 `config.json`，重启会生成默认值
-</details>
-
-<details>
-<summary><b>Q: 截图按钮点击后崩溃？</b></summary>
-
-确保安装了 `pillow`：
-```bash
-pip install pillow
-```
-如果仍崩溃，查看终端报错，常见是多屏 DPI 冲突，可尝试把副屏分辨率缩放调成 100%。
-</details>
-
-<details>
-<summary><b>Q: AI 回复很慢 / 超时？</b></summary>
-
-- 国内访问 OpenAI / Moonshot 建议走代理
-- Groq 国内可直连，速度最快
-- Ollama 本地模型取决于显卡，`qwen2:7b` 需 ~6GB 显存
-</details>
-
-<details>
-<summary><b>Q: 如何把数据从 A 机器迁移到 B 机器？</b></summary>
-
-1. A 机器：管理窗口 → 备份 → 导出为 zip
-2. 通过邮件/U盘传到 B 机器
-3. B 机器：备份 → 导入 zip  
-或者直接复制整个 `data/` 目录到 B 机器即可。
-</details>
-
-<details>
-<summary><b>Q: 开机自启不生效？</b></summary>
-
-- 设置中勾选 "开机自启"
-- 本质是写入 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
-- 如被安全软件拦截，请手动放行
-</details>
-
----
-
-## 🛠️ 开发 & 贡献
+## 🧪 开发 / 调试
 
 ```bash
-# 克隆
-git clone https://github.com/fxlsunny/ai-desktop-task-manager.git
-cd ai-desktop-task-manager
+# 前台启动（能看 print 输出）
+python src\main.py
 
-# 运行
-python main.py
-
-# 无需编译 / 打包，直接修改即可生效
+# 单独测某模块
+python -c "import sys; sys.path.insert(0,'src'); import config; print(config.load())"
 ```
 
-欢迎提交 [Issue](https://github.com/fxlsunny/ai-desktop-task-manager/issues) 和 Pull Request！
+### 代码架构速查
 
-### 路线图
-- [ ] macOS / Linux 适配（替换注册表模块）
-- [ ] 任务看板视图（类 Kanban）
+- 主循环在 `main.py::main()`，用 Tk mainloop 驱动
+- 任务数据流：`models.Store` ← → `data/tasks.json`（原子写入）
+- AI 后端抽象：`ai_chat.py` 里 `OllamaBackend` / `OpenAICompatBackend` 实现统一 `stream(messages)` 接口
+- 悬浮窗与管理窗通过回调解耦，`_on_cfg_saved` 负责配置变更后的整体刷新
+
+---
+
+## ❓ FAQ
+
+**Q1. 为什么悬浮窗没有透明效果？**  
+A. Windows 需要显卡支持 `WS_EX_LAYERED`，几乎所有 Win10/11 机器都支持；如果是远程桌面场景可能被降级，改用"可调透明"滑块即可。
+
+**Q2. 截图后图片保存在哪？**  
+A. `data/img/YYYYMMDD/HHMMSS_xxx_桌面管理.jpg`，按日期归档；任务内容里插入的是**相对路径**，即使迁移 data 目录也不坏图。
+
+**Q3. AI 回复很慢？**  
+A. 检查三个方向：
+- 网络：部分海外 API（OpenAI / Groq）需要科学上网
+- 服务商：切换到国内的腾讯混元 / DeepSeek
+- 本地：启用 Ollama，离线运行完全无延迟
+
+**Q4. 能不能同步到手机？**  
+A. 目前没做移动端；可用"备份 → 邮件发送 zip"功能把 tasks.json 传到手机查看。
+
+**Q5. 能否打包成 exe？**  
+A. 可以，用 PyInstaller：  
+```bash
+pyinstaller --noconsole --onefile --add-data "config/config.example.json;config" src/main.py
+```
+
+---
+
+## 📋 路线图
+
+- [x] 多模型 AI 助手 + 会话持久化
+- [x] 放大编辑器 + Markdown 预览
+- [x] 桌面截图标注 + 任务内联
+- [x] 邮件备份
+- [ ] 云同步（WebDAV / S3）
+- [ ] 移动端查看（只读 Web）
+- [ ] 任务看板（Kanban）视图
 - [ ] 番茄钟集成
-- [ ] 每日/每周 AI 总结报告
-- [ ] 导出为 PDF 报告
-- [ ] 多设备云端同步（WebDAV / OneDrive）
 
 ---
 
-## 📄 许可证
+## 🤝 贡献
 
-[MIT License](LICENSE) © 2026 fxlsunny
+欢迎 issue / PR。代码风格：
+- Python 标准库优先，避免引入重型依赖
+- 新增功能必须"可降级"：缺少可选依赖时只提示、不崩溃
+- 每个 UI 文件保持单一职责（窗口/组件一一对应）
 
 ---
 
-## 🙏 致谢
+## 📜 License
 
-- Python 标准库 & Tkinter 的设计者们
-- [Pillow](https://python-pillow.org/) 提供图像能力
-- [Groq](https://groq.com) / [DeepSeek](https://deepseek.com) / [腾讯混元](https://hunyuan.tencent.com) 提供的免费/低价 API
-- 所有提过 Issue 和建议的朋友
+[MIT License](./LICENSE) © 2026 fxlsunny
