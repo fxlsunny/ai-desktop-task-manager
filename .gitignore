@@ -11,14 +11,19 @@ ENV/
 dist/
 build/
 
-# 项目数据文件（个人隐私数据，不应上传）
+# 本地数据（任务、对话历史、截图等）
 data/
-*.json
-!config.json.example
+
+# 本地配置（含真实 API Key，禁止入库）
+config/config.json
+# 例外：允许模板入库
+!config/config.example.json
 
 # 运行时临时文件
 *.log
 *.tmp
+_smoke_*
+_test_*
 
 # Windows
 Thumbs.db
@@ -31,6 +36,3 @@ $RECYCLE.BIN/
 .idea/
 *.swp
 *.swo
-
-# 截图输出
-data/img/
