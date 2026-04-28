@@ -2,7 +2,8 @@
 桌面透明悬浮窗口 - 始终置顶，可拖动，卡片内快速操作
 """
 import tkinter as tk
-from models import Task, Store, PRIORITY_COLORS, PRIORITY_LABELS
+from models import Task, Store, PRIORITY_COLORS, priority_label
+from i18n import t as _t
 
 CHROMA = "#010101"   # 透明色键（勿在UI中使用）
 
@@ -34,6 +35,9 @@ class Overlay:
         self.screenshot_cb = screenshot_cb    # 截图回调
         self._drag_ox      = self._drag_oy = 0
         self._minimized    = False
+        # 缩放拖拽起始状态（按下右下角拖手时记录）
+        self._rs_x0 = self._rs_y0 = 0
+        self._rs_w0 = self._rs_h0 = 0
 
         self.win = tk.Toplevel(root)
         self._init_win()
@@ -45,12 +49,40 @@ class Overlay:
         w = self.win
         w.overrideredirect(True)
         w.wm_attributes("-topmost",        self.cfg.get("overlay_always_top", True))
-        w.wm_attributes("-transparentcolor", CHROMA)
+        try:
+            w.wm_attributes("-transparentcolor", CHROMA)
+        except tk.TclError:
+            pass  # 非 Windows 平台不支持 -transparentcolor，忽略即可
         w.wm_attributes("-alpha",          self.cfg.get("overlay_opacity", 0.90))
         x  = self.cfg.get("overlay_x", 20)
         y  = self.cfg.get("overlay_y", 100)
-        ow = self.cfg.get("overlay_width", 300)
-        w.geometry(f"{ow}x600+{x}+{y}")
+        ow = int(self.cfg.get("overlay_width", 300))
+        oh = int(self.cfg.get("overlay_height", 600))
+
+        # 尺寸合法性钳制（防止历史配置异常 / 历史最小宽度过小）
+        # 与 MIN_W/MIN_H 保持一致，避免下次启动恢复到一个挤掉按钮的窗口
+        ow = max(280, min(ow, 1200))
+        oh = max(180, min(oh, 2000))
+
+        # 屏幕边界钳制：防止跨屏幕设备拔掉副屏后窗口跑到屏外不可见
+        try:
+            sw = w.winfo_screenwidth()
+            sh = w.winfo_screenheight()
+            x = max(0, min(int(x), sw - 80))      # 至少留 80px 在屏内
+            y = max(0, min(int(y), sh - 80))
+            if x + ow > sw:
+                x = max(0, sw - ow)
+            if y + oh > sh:
+                y = max(0, sh - oh)
+        except Exception:
+            pass
+        # 把钳制后的值写回 cfg，保证持久化的就是合法值
+        self.cfg["overlay_x"] = x
+        self.cfg["overlay_y"] = y
+        self.cfg["overlay_width"]  = ow
+        self.cfg["overlay_height"] = oh
+
+        w.geometry(f"{ow}x{oh}+{x}+{y}")
         w.configure(bg=CHROMA)
 
     # ─── 构建骨架 ─────────────────────────────────────────────
@@ -72,7 +104,7 @@ class Overlay:
         lbl_ico = tk.Label(bar, text="📋", bg=acc, fg="#0a0a1a",
                            font=("Segoe UI Emoji", 11), cursor="fleur")
         lbl_ico.pack(side="left", padx=(4, 0))
-        lbl_hd = tk.Label(bar, text="桌面任务管家", bg=acc,
+        lbl_hd = tk.Label(bar, text=_t("overlay.title"), bg=acc,
                           fg="#0a0a1a",
                           font=("Microsoft YaHei UI", fs - 1, "bold"),
                           cursor="fleur")
@@ -104,8 +136,7 @@ class Overlay:
         ai_btn.pack(side="right", padx=1)
         ai_btn.bind("<Enter>", lambda e: ai_btn.config(bg="#7c4dff"))
         ai_btn.bind("<Leave>", lambda e: ai_btn.config(bg="#5c35cc"))
-        # 悬浮提示
-        self._ai_tip = tk.Label(self.win, text="AI 助手",
+        self._ai_tip = tk.Label(self.win, text=_t("overlay.tip_ai"),
                                 bg="#5c35cc", fg="#fff",
                                 font=("Microsoft YaHei UI", 8),
                                 relief="flat", padx=4, pady=1)
@@ -128,20 +159,18 @@ class Overlay:
 
         self._show_all_var = tk.BooleanVar(
             value=self.cfg.get("show_completed", False))
-        tk.Label(self.toolbar, text="显示:", bg=bg, fg="#888",
+        tk.Label(self.toolbar, text=_t("overlay.show"), bg=bg, fg="#888",
                  font=("Microsoft YaHei UI", 8)).pack(side="left", padx=(6, 2))
-        # 待办按钮
         self._btn_todo = tk.Button(
-            self.toolbar, text="待办",
+            self.toolbar, text=_t("overlay.todo"),
             command=lambda: self._switch_show(False),
             bg=acc if not self._show_all_var.get() else bg,
             fg="#0a0a1a" if not self._show_all_var.get() else "#888",
             relief="flat", padx=6, pady=0,
             font=("Microsoft YaHei UI", 8, "bold"), cursor="hand2")
         self._btn_todo.pack(side="left")
-        # 全部按钮
         self._btn_all = tk.Button(
-            self.toolbar, text="全部",
+            self.toolbar, text=_t("overlay.all"),
             command=lambda: self._switch_show(True),
             bg=acc if self._show_all_var.get() else bg,
             fg="#0a0a1a" if self._show_all_var.get() else "#888",
@@ -185,11 +214,32 @@ class Overlay:
         self.canvas.bind("<MouseWheel>", self._scroll)
         self.inner.bind("<MouseWheel>",  self._scroll)
 
-        # ── 状态栏 ──────────────────────────────────────────
-        self.status = tk.Label(self.outer, text="", bg=bg,
-                               fg="#666",
+        # ── 状态栏 ─────────────────────────────────────────
+        # 状态栏只放文字；缩放手柄独立用 place() 绑到 self.win 的右下角，
+        # 这样无论窗口怎么 resize/relayout，手柄位置都稳定可点。
+        self.status_bar = tk.Frame(self.outer, bg=bg)
+        self.status_bar.pack(fill="x", padx=0, pady=(0, 0))
+
+        self.status = tk.Label(self.status_bar, text="", bg=bg,
+                               fg="#666", anchor="w",
                                font=("Microsoft YaHei UI", 8))
-        self.status.pack(fill="x", padx=4, pady=(0, 3))
+        self.status.pack(side="left", fill="x", expand=True,
+                         padx=(4, 18), pady=(0, 3))   # 右侧留 18px 给 grip
+
+        # 缩放拖手：右下角，◢ + size_nw_se 光标；用 place() 锚定到 win 右下角
+        self.grip = tk.Label(self.win, text="◢", bg=bg, fg="#888",
+                             font=("Arial", 11, "bold"),
+                             cursor="size_nw_se",
+                             padx=2, pady=0)
+        # relx=1.0 / rely=1.0 + anchor="se" → 右下角对齐；用负偏移避开外框 1px 高亮
+        self.grip.place(relx=1.0, rely=1.0, anchor="se", x=-2, y=-2)
+        self.grip.bind("<ButtonPress-1>",   self._on_resize_press)
+        self.grip.bind("<B1-Motion>",       self._on_resize_drag)
+        self.grip.bind("<ButtonRelease-1>", self._on_resize_release)
+        self.grip.bind("<Enter>", lambda e: self.grip.config(fg=acc))
+        self.grip.bind("<Leave>", lambda e: self.grip.config(fg="#888"))
+        # 保证 grip 永远在最上层（高于 status_bar 内容）
+        self.grip.lift()
 
     # ─── 显示切换 ─────────────────────────────────────────────
     def _switch_show(self, show_all: bool):
@@ -221,7 +271,7 @@ class Overlay:
         fs  = self.cfg["font_size"]
 
         if not tasks:
-            tk.Label(self.inner, text="暂无待办任务\n点击 ＋ 添加", bg=bg,
+            tk.Label(self.inner, text=_t("overlay.empty"), bg=bg,
                      fg="#555", font=("Microsoft YaHei UI", fs),
                      justify="center").pack(pady=25)
         else:
@@ -230,7 +280,8 @@ class Overlay:
 
         active = len(self.store.active())
         total  = len(self.store.all())
-        self.status.config(text=f"待办 {active} / 共 {total} 项  ·  双击管理")
+        self.status.config(
+            text=_t("overlay.status", active=active, total=total))
 
     # ─── 单张任务卡片 ─────────────────────────────────────────
     def _card(self, t: Task, idx: int, bg, acc, fg, fs):
@@ -275,9 +326,9 @@ class Overlay:
             info.append(f"⏰{s}")
         elapsed = t.elapsed_days
         if elapsed == 0:
-            info.append("📅今天")
+            info.append(f"📅{_t('overlay.today')}")
         else:
-            info.append(f"📅{elapsed}天")
+            info.append(f"📅{_t('overlay.days', n=elapsed)}")
         if info:
             tk.Label(card, text="  ".join(info), bg=cb, fg="#ffd54f",
                      font=("Microsoft YaHei UI", fs - 2), anchor="w").pack(fill="x")
@@ -318,10 +369,9 @@ class Overlay:
                       activebackground="#4fc3f7",
                       activeforeground="#000").pack(side="left", padx=1)
 
-        # 优先级快速切换
         pri_btn = tk.Button(
             action_row,
-            text=f"🔥{PRIORITY_LABELS[t.priority]}",
+            text=f"🔥{priority_label(t.priority)}",
             command=lambda tid=t.task_id, p=t.priority: self._next_priority(tid, p),
             bg="#1a1a3a", fg=pc, relief="flat",
             font=("Microsoft YaHei UI", 7), padx=4, pady=0,
@@ -363,17 +413,27 @@ class Overlay:
 
     # ─── 折叠 / 展开 ─────────────────────────────────────────
     def _toggle_min(self):
-        ow = self.cfg.get("overlay_width", 300)
+        ow = int(self.cfg.get("overlay_width", 300))
+        oh = int(self.cfg.get("overlay_height", 600))
         if self._minimized:
             self.toolbar.pack(fill="x")
             self.body.pack(fill="both", expand=True)
-            self.status.pack(fill="x", padx=4, pady=(0, 3))
-            self.win.geometry(f"{ow}x600")
+            self.status_bar.pack(fill="x")
+            self.win.geometry(f"{ow}x{oh}")
+            try:
+                self.grip.place(relx=1.0, rely=1.0, anchor="se", x=-2, y=-2)
+                self.grip.lift()
+            except Exception:
+                pass
             self._minimized = False
         else:
             self.toolbar.pack_forget()
             self.body.pack_forget()
-            self.status.pack_forget()
+            self.status_bar.pack_forget()
+            try:
+                self.grip.place_forget()    # 折叠时藏起 grip，避免遮挡标题栏按钮
+            except Exception:
+                pass
             self.win.geometry(f"{ow}x26")
             self._minimized = True
 
@@ -388,6 +448,58 @@ class Overlay:
         self.win.geometry(f"+{x}+{y}")
         self.cfg["overlay_x"] = x
         self.cfg["overlay_y"] = y
+
+    # ─── 右下角拖手缩放 ──────────────────────────────────────
+    # 折叠状态下不允许缩放（避免破坏折叠形态）。
+    # 最小宽度 280：保证标题栏 4 个按钮（－ ＋ 🤖 ×）+ 图标 + 标题在中英文下都不被挤掉。
+    # 最小高度 180：保证标题栏 + 工具栏 + 至少一行任务可见。
+    MIN_W, MIN_H = 280, 180
+
+    def _on_resize_press(self, e):
+        if self._minimized:
+            return
+        self.win.update_idletasks()      # 同步真实尺寸，避免读到上一次拖拽队列中的旧值
+        self._rs_x0 = e.x_root
+        self._rs_y0 = e.y_root
+        self._rs_w0 = self.win.winfo_width()
+        self._rs_h0 = self.win.winfo_height()
+
+    def _on_resize_drag(self, e):
+        # 注：不再用 _rs_w0==0 做活跃判定，按下后即视为可拖；折叠状态除外。
+        if self._minimized:
+            return
+        if self._rs_w0 <= 0 or self._rs_h0 <= 0:
+            # 极端情况下 press 没记录到尺寸，按当前尺寸兜底
+            self._rs_w0 = self.win.winfo_width()
+            self._rs_h0 = self.win.winfo_height()
+            self._rs_x0 = e.x_root
+            self._rs_y0 = e.y_root
+            return
+        dw = e.x_root - self._rs_x0
+        dh = e.y_root - self._rs_y0
+        try:
+            sw = self.win.winfo_screenwidth()
+            sh = self.win.winfo_screenheight()
+        except Exception:
+            sw = sh = 99999
+        x = self.win.winfo_x()
+        y = self.win.winfo_y()
+        new_w = max(self.MIN_W, min(self._rs_w0 + dw, sw - x))
+        new_h = max(self.MIN_H, min(self._rs_h0 + dh, sh - y))
+        self.win.geometry(f"{new_w}x{new_h}")
+
+    def _on_resize_release(self, _e):
+        if self._minimized:
+            return
+        try:
+            self.win.update_idletasks()
+            self.cfg["overlay_width"]  = int(self.win.winfo_width())
+            self.cfg["overlay_height"] = int(self.win.winfo_height())
+        except Exception:
+            pass
+        # 注意：不要把 _rs_w0/_rs_h0 重置为 0，
+        # 否则一旦下次 press 因为 update_idletasks 时序问题没采到值，
+        # drag 早返回就会出现"再也拖不动"。下次 press 会自然覆盖。
 
     def _scroll(self, e):
         self.canvas.yview_scroll(-1 * (e.delta // 120), "units")
@@ -426,9 +538,21 @@ class Overlay:
     # ─── 退出 ─────────────────────────────────────────────────
     def _on_quit(self):
         from tkinter import messagebox
-        if messagebox.askokcancel("退出", "确定要退出桌面任务管家吗？",
-                                  parent=self.win):
+        if messagebox.askokcancel(
+                _t("common.exit"),
+                _t("common.exit_confirm", app=_t("common.app_name")),
+                parent=self.win):
             if self.quit_cb:
                 self.quit_cb()
             else:
                 self.root.destroy()
+
+    # ─── 语言切换：销毁内部并重建 UI ──────────────────────────
+    def rebuild_ui(self):
+        try:
+            for w in self.outer.winfo_children() + [self.outer]:
+                w.destroy()
+        except Exception:
+            pass
+        self._build()
+        self.refresh()
