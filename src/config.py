@@ -62,9 +62,12 @@ def _normalize_for_save(raw: str | os.PathLike) -> str:
 
 DEFAULTS = {
     "data_dir": DEFAULT_DATA_DIR,
+    # 界面语言：zh_CN（默认中文）/ en_US（English）
+    "language": "zh_CN",
     "overlay_x": 20,
     "overlay_y": 100,
     "overlay_width": 280,
+    "overlay_height": 600,
     "overlay_opacity": 0.90,
     "overlay_always_top": True,
     "overlay_visible": True,
