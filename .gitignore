@@ -24,12 +24,23 @@ config/config.json
 *.tmp
 _smoke_*
 _test_*
+logs/
 
 # Windows
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 *.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.Trash-*
 
 # IDE
 .vscode/
