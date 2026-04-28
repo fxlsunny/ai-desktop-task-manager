@@ -1,27 +1,44 @@
 # 🖥️ AI Desktop Task Manager (桌面任务管家)
 
-> 一个极简、低资源占用的 Windows 桌面任务管理工具。集成多模型 AI 助手、Markdown 编辑器、桌面截图标注、闹钟提醒等实用功能，全部由 Python 标准库 + Tkinter 构建，**零强依赖、毫秒级启动、内存占用 ~20MB**。
+> 一个极简、低资源占用的跨平台桌面任务管理工具。集成多模型 AI 助手、Markdown 编辑器、桌面截图标注、闹钟提醒等实用功能，全部由 Python 标准库 + Tkinter 构建，**零强依赖、毫秒级启动、内存占用 ~20MB**。
+>
+> 支持 **Windows / macOS / Linux** 三大平台，界面提供 **🇨🇳 中文 / 🇺🇸 English** 双语，可在「设置」中一键切换，默认中文。
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue) ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey) ![License](https://img.shields.io/badge/License-MIT-green) ![Dependencies](https://img.shields.io/badge/Core%20Deps-Zero-success)
+🌐 **Language**：[简体中文](./README.md) | [English](./README.en.md)
+
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue) ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) ![Language](https://img.shields.io/badge/i18n-zh__CN%20%2F%20en__US-orange) ![License](https://img.shields.io/badge/License-MIT-green) ![Dependencies](https://img.shields.io/badge/Core%20Deps-Zero-success)
 
 ---
 
 ## 📸 界面预览
 
-![桌面任务管家 - 主界面](./img/ai_task_manager_01.jpg)
+### 中文界面
 
-> 半透明悬浮窗（可拖拽 / 折叠 / 调透明度） + 任务管理窗 + AI 对话窗 + 放大编辑器 + 桌面截图标注，一套串起来。
+![桌面任务管家 - 中文界面](./img/ai_task_manager_01.jpg)
+
+### English UI
+
+![Desktop Task Manager - English UI](./img/ai_task_manager_02.jpg)
+
+> 半透明悬浮窗（可拖拽 / 折叠 / **拖拽调整大小** / 调透明度） + 任务管理窗 + AI 对话窗 + 放大编辑器 + 桌面截图标注，一套串起来。
 
 ---
 
 ## ✨ 核心功能
 
 ### 🖥️ 桌面悬浮窗
-- 始终置顶显示，可拖拽到屏幕任意位置
+- 始终置顶显示，可拖拽标题栏到屏幕任意位置
+- **拖拽缩放**：右下角 `◢` 手柄可同时调整宽 / 高，最小 `280×180`，松手自动持久化到 `config.json`
 - **透明度可调**（20% ~ 100%），不干扰工作
 - **一键折叠**，只保留顶栏标题条
+- **屏幕边界自动钳制**：跨屏拔副屏后窗口不会跑到屏外失踪
 - 可选系统托盘图标（依赖 `pystray`，已自动降级）
-- 开机自启动（写入注册表，一键开关）
+- **跨平台开机自启动**：Windows 注册表 / macOS LaunchAgent / Linux `~/.config/autostart/*.desktop`，一键开关
+
+### 🌐 多语言（i18n）
+- 内置 **🇨🇳 简体中文** + **🇺🇸 English** 两套完整 UI 翻译
+- 默认中文（`config.language = "zh_CN"`），在「设置 → 界面语言 / Language」下拉中可切到 `en_US`
+- 切换后管理窗口、悬浮窗、AI 对话窗、托盘菜单立即用新语言重建，**无需重启**
 
 ### 📝 任务管理
 - 任务支持：**标题 / 内容 / 优先级 / 截止日期 / 闹钟提醒 / 分类标签**
@@ -79,23 +96,34 @@
 
 ```
 ai-desktop-task-manager/
-├── src/                         # 所有 Python 源码
-│   ├── main.py                  # ← 程序入口
+├── src/                         # ─── 所有 Python 源代码 ───
+│   ├── main.py                  # 程序入口
+│   ├── i18n.py                  # 多语言（zh_CN / en_US）翻译表
+│   ├── platform_utils.py        # 跨平台工具（DPI / beep / autostart）
 │   ├── config.py                # 配置加载/保存
 │   ├── models.py                # 任务数据模型 & Store
 │   ├── overlay.py               # 桌面悬浮窗
 │   ├── manager.py               # 任务管理窗
 │   ├── ai_window.py             # AI 对话窗
-│   ├── ai_chat.py               # AI 后端抽象（OpenAI/Ollama）
-│   ├── chat_history.py          # 对话会话持久化
+│   ├── ai_chat.py               # AI 后端抽象（OpenAI/Ollama）+ 会话持久化
 │   ├── markdown_editor.py       # 放大编辑器（MD 预览 + 搜索替换）
 │   ├── screenshot.py            # 桌面截图 & 标注
-│   ├── alarm.py                 # 闹钟提醒
+│   ├── alarm.py                 # 闹钟提醒（跨平台 beep）
 │   ├── backup.py                # 备份 & 邮件导出
-│   └── autostart.py             # 开机自启动（Windows 注册表）
-├── scripts/
-│   ├── 桌面任务管理.bat          # 启动脚本（双击运行）
-│   └── 安装可选依赖.bat          # 一键装 pystray / pillow / keyboard
+│   └── autostart.py             # 开机自启动（兼容层，转发到 platform_utils）
+│
+├── scripts/                     # ─── 所有可执行脚本（启动 / 安装 / 维护）───
+│   ├── run.py                   # ★ 跨平台 Python 启动器（带崩溃日志）
+│   ├── start.bat                # Windows 启动（pythonw 静默 + --console 排错）
+│   ├── start.sh                 # Linux / macOS Shell 启动
+│   ├── start.command            # macOS Finder 双击启动
+│   ├── install_deps.bat         # Windows 一键装可选依赖
+│   ├── install_deps.sh          # Linux / macOS 一键装可选依赖
+│   └── _sync_img.py             # 维护：把 README/图片同步到 GitHub（开发者用）
+│
+├── start.bat                    # ★ 根目录便捷入口（转发 scripts\start.bat）
+├── start.sh                     # ★ 根目录便捷入口（转发 scripts/start.sh）
+│
 ├── config/
 │   ├── config.example.json      # 配置模板（入库）
 │   └── config.json              # 本地真实配置（含 Key，.gitignore，首次启动自动生成）
@@ -103,63 +131,122 @@ ai-desktop-task-manager/
 │   ├── tasks.json               # 任务列表
 │   ├── chat_history/            # AI 会话 JSON
 │   └── img/YYYYMMDD/            # 截图按日期归档
+├── logs/                        # 运行时日志（.gitignore，崩溃自动写入）
+│   └── runtime.log              # 静默崩溃堆栈（pythonw 模式排错用）
 ├── img/                         # README 展示图（入库）
-│   └── ai_task_manager_01.jpg
-├── README.md
+│   ├── ai_task_manager_01.jpg   # 中文 UI 预览
+│   └── ai_task_manager_02.jpg   # English UI preview
+│
+├── requirements.txt             # 可选依赖清单
+├── README.md                    # 中文文档
+├── README.en.md                 # English documentation
 ├── LICENSE
 └── .gitignore
 ```
+
+> 📐 **目录约定**：`src/` = 所有源代码；`scripts/` = 所有可执行脚本；根目录只放标准元数据（README/LICENSE/requirements）+ 数据目录（config/data/logs/img）+ 双击便捷入口（start.bat / start.sh）。
 
 ---
 
 ## 🚀 快速开始
 
 ### 1. 环境要求
-- **Python 3.8+**（Windows 系统）
-- 只需 Python 标准库 + Tkinter（Python 自带）即可运行
-- 可选依赖（增强体验，非必须）：
-  - `pystray` + `pillow`：系统托盘图标 & 截图
-  - `keyboard`：全局热键 Ctrl+Alt+A 截图
 
-### 2. 克隆 & 启动
+| 平台 | Python | Tkinter | 备注 |
+|------|--------|---------|------|
+| Windows 10/11 | 3.8+（[官方下载](https://www.python.org/downloads/windows/)） | 自带 | 推荐 64-bit |
+| macOS 11+ | 3.8+（`brew install python@3.12`） | `brew install python-tk` | Apple Silicon 原生支持 |
+| Ubuntu/Debian | 3.8+（`sudo apt install python3`） | `sudo apt install python3-tk` | 需要 X11 / Wayland |
+| Fedora | 3.8+（`sudo dnf install python3`） | `sudo dnf install python3-tkinter` | — |
+| Arch / Manjaro | 3.8+（`sudo pacman -S python`） | `sudo pacman -S tk` | — |
+
+> 核心运行 **零依赖**（只需 Python 标准库 + Tkinter）。可选依赖：`pillow`（截图与图片预览）、`pystray`（系统托盘）、`keyboard`（全局热键，Linux 需 root，macOS 需辅助功能权限）。
+
+### 2. 克隆
 
 ```bash
 git clone https://github.com/fxlsunny/ai-desktop-task-manager.git
 cd ai-desktop-task-manager
 ```
 
-**方式 A：双击 `.bat`（推荐，Windows）**
+### 3. 启动 — 三平台一键脚本
 
-```
-scripts\桌面任务管理.bat
-```
+| 平台 | 启动方式 | 安装可选依赖 |
+|------|----------|--------------|
+| **Windows** | 双击根目录 `start.bat`（前台排错：`start.bat --console`） | 双击 `scripts\install_deps.bat` |
+| **macOS**   | 双击 `scripts/start.command`（首次需 `chmod +x scripts/start.command`） | `bash scripts/install_deps.sh` |
+| **Linux**   | `./start.sh`（首次 `chmod +x start.sh scripts/*.sh`）<br>前台调试：`./start.sh --console` | `./scripts/install_deps.sh` |
 
-> 首次启动会自动从 `config/config.example.json` 生成 `config/config.json`，然后退出并提示你填 API Key。  
-> 填好后再次双击即可启动。
-
-**方式 B：命令行**
+或者通用命令行（所有平台一致）：
 
 ```bash
-# 首次使用：复制配置模板
-copy config\config.example.json config\config.json    # Windows
-# cp config/config.example.json config/config.json     # Linux/macOS
+# 推荐：使用跨平台启动器
+python scripts/run.py             # 自动隐藏控制台（Windows pythonw）
+python scripts/run.py --console   # 强制保留控制台（看日志）
 
-# 启动
-pythonw src\main.py
-# 或前台模式（能看日志）
-python src\main.py
+# 或者直接运行 src/main.py
+python src/main.py
 ```
 
-### 3. 安装可选依赖（可跳过）
+> 首次启动会自动从 `config/config.example.json` 生成 `config/config.json`。在程序设置中填入 API Key 即可。
 
-```
-scripts\安装可选依赖.bat
+### 4. 切换 UI 语言（中 / English）
+
+启动程序 → `📋 打开管理器` → `⚙️ 设置` → 找到 **「界面语言 / Language」** 下拉框 → 选择 `English` 保存即可，管理窗口会自动用新语言重建，**无需重启**。
+
+### 5. 开机自启动
+
+在 `⚙️ 设置` 中勾选 **「开机自启动 / Run at startup」**，三平台分别：
+
+| 平台 | 实现方式 | 文件位置 |
+|------|----------|----------|
+| Windows | 写入注册表 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` | — |
+| macOS  | 创建 LaunchAgent | `~/Library/LaunchAgents/com.fxlsunny.DesktopTaskManager.plist` |
+| Linux  | 创建 freedesktop autostart | `~/.config/autostart/DesktopTaskManager.desktop` |
+
+> 取消勾选会自动清理对应文件 / 注册表项，保持系统干净。
+
+---
+
+## 🐧🍎 跨平台部署详解
+
+### Windows
+```powershell
+git clone https://github.com/fxlsunny/ai-desktop-task-manager.git
+cd ai-desktop-task-manager
+scripts\install_deps.bat   # 可选
+start.bat                  # 双击根目录的 start.bat 也可
 ```
 
-或手动：
+### macOS
 ```bash
-python -m pip install pystray pillow keyboard
+brew install python@3.12 python-tk
+git clone https://github.com/fxlsunny/ai-desktop-task-manager.git
+cd ai-desktop-task-manager
+chmod +x start.sh scripts/start.sh scripts/start.command scripts/install_deps.sh
+bash scripts/install_deps.sh   # 可选
+./start.sh                     # 或在 Finder 双击 scripts/start.command
 ```
+> macOS Big Sur 及以上首次双击 `scripts/start.command` 时若提示「无法打开」，请在 *系统设置 → 隐私与安全性* 中点击「仍要打开」。
+
+### Linux（Ubuntu/Debian 示例）
+```bash
+sudo apt update
+sudo apt install -y python3 python3-tk python3-pip git
+git clone https://github.com/fxlsunny/ai-desktop-task-manager.git
+cd ai-desktop-task-manager
+chmod +x start.sh scripts/start.sh scripts/install_deps.sh
+./scripts/install_deps.sh   # 可选
+./start.sh
+```
+> Wayland 桌面（GNOME 42+）下截图功能依赖 `xdg-desktop-portal` 或在 X11 会话下使用更稳定。
+> 系统托盘需要安装 `gir1.2-appindicator3-0.1`（GNOME）或 KDE 自带的 SNI 支持。
+
+### 通过 Docker / 远程桌面
+程序是纯桌面应用，运行需要图形会话。如需在服务器运行，建议配合：
+- **VcXsrv / X410**（Windows 转发 X11）
+- **xrdp / VNC**（Linux 远程桌面）
+- **macOS 屏幕共享**
 
 ---
 
@@ -285,11 +372,43 @@ A. 检查三个方向：
 **Q4. 能不能同步到手机？**  
 A. 目前没做移动端；可用"备份 → 邮件发送 zip"功能把 tasks.json 传到手机查看。
 
-**Q5. 能否打包成 exe？**  
+**Q5. 能否打包成 exe / .app / AppImage？**  
 A. 可以，用 PyInstaller：  
 ```bash
-pyinstaller --noconsole --onefile --add-data "config/config.example.json;config" src/main.py
+# Windows
+pyinstaller --noconsole --onefile --add-data "config/config.example.json;config" --name "DesktopTaskManager" scripts/run.py
+
+# macOS（生成 .app）
+pyinstaller --noconsole --onefile --windowed --add-data "config/config.example.json:config" --name "DesktopTaskManager" scripts/run.py
+
+# Linux（生成可执行文件，再用 appimagetool 打成 AppImage 即可）
+pyinstaller --onefile --add-data "config/config.example.json:config" --name "DesktopTaskManager" scripts/run.py
 ```
+
+**Q6. 怎么切换到英文界面？**  
+A. 启动程序 → `📋 打开管理器` → `⚙️ 设置 / Settings` → 找到 **「界面语言 / Language」** 下拉，选择 `English` 后点击 **「💾 保存所有设置」**。语言切换后管理窗口会自动重建，所有 UI（任务列表 / 编辑表单 / 设置 / 备份 / 截图 / AI 助手 / 悬浮窗 / 托盘菜单）实时切换；下次打开 AI 对话窗时也会用新语言。
+
+**Q7. macOS 双击 `start.command` 提示「无法验证开发者」？**  
+A. 这是 Gatekeeper 的默认拦截。在 *系统设置 → 隐私与安全性* 底部点击「仍要打开」，或终端执行：
+```bash
+xattr -d com.apple.quarantine scripts/start.command
+```
+
+**Q8. Linux 上系统托盘图标看不到？**  
+A. GNOME 默认不显示传统托盘，需安装扩展：
+- **GNOME**：安装 [AppIndicator and KStatusNotifierItem Support](https://extensions.gnome.org/extension/615/appindicator-support/) 扩展
+- **KDE / XFCE / Cinnamon**：开箱即用，无需额外操作
+
+**Q9. Windows 双击 `start.bat` 没有反应 / 一闪而过？**  
+A. `start.bat` 默认走 `pythonw.exe`（无控制台、无窗口），便于日常使用。若启动失败请按以下顺序排查：
+1. **改用控制台模式**实时看错误：在终端中执行 `start.bat --console`（根目录或 `scripts\start.bat --console` 都可以）。
+2. **查看崩溃日志**：`scripts/run.py` 已自动把未捕获异常写入 `logs/runtime.log`，含完整堆栈。
+3. **检查悬浮窗是否飞屏外**：换屏 / 拔掉副屏后 `config/config.json` 里的 `overlay_x` / `overlay_y` 可能指向已不存在的坐标。本仓库已加入屏幕边界自动钳制，但若仍异常可手动把这两个值改成 `20` / `100`。
+4. **缺 Tkinter**：极少见——重新运行 Python 安装包，勾选 `tcl/tk and IDLE` 组件。
+5. **Python 版本过低**：需要 Python 3.8+。终端 `python --version` 验证。
+
+**Q10. 桌面悬浮窗可以拖动调整大小吗？**  
+A. 可以。悬浮窗右下角有一个 `◢` 缩放手柄，按住拖动即可同时调整宽高，松开后会自动保存到 `config.json`。最小尺寸 `280×180`，保证标题栏的最小化 / 加号 / AI / 关闭四个基础按钮始终可见。
 
 ---
 
@@ -299,6 +418,10 @@ pyinstaller --noconsole --onefile --add-data "config/config.example.json;config"
 - [x] 放大编辑器 + Markdown 预览
 - [x] 桌面截图标注 + 任务内联
 - [x] 邮件备份
+- [x] **跨平台支持**（Windows / macOS / Linux）
+- [x] **多语言 UI**（中文 / English）
+- [x] **悬浮窗可拖拽调整大小**
+- [ ] 更多语言（日 / 韩 / 法 / 德…欢迎 PR）
 - [ ] 云同步（WebDAV / S3）
 - [ ] 移动端查看（只读 Web）
 - [ ] 任务看板（Kanban）视图
