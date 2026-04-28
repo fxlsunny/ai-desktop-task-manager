@@ -29,8 +29,10 @@ try:
     from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageGrab, ImageTk
 except ImportError as _e:   # pragma: no cover
     raise ImportError(
-        "需要安装 Pillow: pip install pillow"
+        "Pillow is required: pip install pillow"
     ) from _e
+
+from i18n import t as _t
 
 
 def _log(msg: str):
@@ -207,7 +209,7 @@ class _RegionPicker:
             tags="hint_box")
         self.canvas.create_text(
             20, 30, anchor="w",
-            text="🎯 按住鼠标左键拖拽选择区域    |    ESC 取消",
+            text=_t("shot.hint"),
             fill=self.HINT_FG,
             font=("Microsoft YaHei UI", 11, "bold"),
             tags="hint_text")
@@ -248,8 +250,7 @@ class _RegionPicker:
         # 仅更新坐标显示
         self.canvas.itemconfigure(
             "hint_text",
-            text=f"🎯 鼠标 ({e.x_root}, {e.y_root})  "
-                 f"按住拖拽选择    |    ESC 取消")
+            text=_t("shot.hint.coord", x=e.x_root, y=e.y_root))
 
     # ── 鼠标事件：记录起点 / 实时画框 / 松开完成 ────────
     def _on_press(self, e):
@@ -280,7 +281,7 @@ class _RegionPicker:
         w, h = abs(x1 - x0), abs(y1 - y0)
         self.canvas.itemconfigure(
             "hint_text",
-            text=f"📐 区域 {w}×{h}（逻辑）    松开完成  ESC 取消")
+            text=_t("shot.hint.size", w=w, h=h))
 
     def _on_release(self, e):
         if self._start is None or self._done:
@@ -405,7 +406,7 @@ class ScreenshotEditor:
         self._flatten_img = None
 
         self.win = tk.Toplevel(root)
-        self.win.title("📷 截图编辑")
+        self.win.title(_t("shot.window.title"))
         self.win.configure(bg=self.BG)
         self.win.protocol("WM_DELETE_WINDOW", self._on_cancel)
 
@@ -443,17 +444,17 @@ class ScreenshotEditor:
         side.pack(side="left", fill="y")
         side.pack_propagate(False)
 
-        tk.Label(side, text="🛠 工具", bg=self.BG2, fg=self.ACC,
+        tk.Label(side, text=_t("shot.tools"), bg=self.BG2, fg=self.ACC,
                  font=("Microsoft YaHei UI", 11, "bold")
                  ).pack(pady=(10, 6))
 
         for key, label in [
-            ("rect",   "▭ 矩形"),
-            ("oval",   "○ 椭圆"),
-            ("arrow",  "➤ 箭头"),
-            ("pen",    "✎ 画笔"),
-            ("text",   "T 文字"),
-            ("mosaic", "▨ 马赛克"),
+            ("rect",   _t("shot.tool.rect")),
+            ("oval",   _t("shot.tool.oval")),
+            ("arrow",  _t("shot.tool.arrow")),
+            ("pen",    _t("shot.tool.pen")),
+            ("text",   _t("shot.tool.text")),
+            ("mosaic", _t("shot.tool.mosaic")),
         ]:
             b = tk.Button(side, text=label, width=12,
                           command=lambda k=key: self._set_tool(k),
@@ -464,7 +465,7 @@ class ScreenshotEditor:
             b.pack(padx=10, pady=2, fill="x")
             self._tool_btns[key] = b
 
-        tk.Label(side, text="颜色", bg=self.BG2, fg=self.FG_DIM,
+        tk.Label(side, text=_t("shot.color"), bg=self.BG2, fg=self.FG_DIM,
                  font=("Microsoft YaHei UI", 10)
                  ).pack(pady=(14, 2))
         cf = tk.Frame(side, bg=self.BG2)
@@ -476,14 +477,14 @@ class ScreenshotEditor:
                           activebackground=c)
             b.grid(row=i // 4, column=i % 4, padx=2, pady=2)
             self._color_btns.append(b)
-        tk.Button(side, text="🎨 更多...", command=self._pick_color,
+        tk.Button(side, text=_t("shot.color.more"), command=self._pick_color,
                   bg=self.BG3, fg=self.FG, relief="flat",
                   font=("Microsoft YaHei UI", 9),
                   padx=4, pady=2, cursor="hand2",
                   activebackground=self.ACC
                   ).pack(pady=(4, 10), padx=10, fill="x")
 
-        tk.Label(side, text="粗细", bg=self.BG2, fg=self.FG_DIM,
+        tk.Label(side, text=_t("shot.thickness"), bg=self.BG2, fg=self.FG_DIM,
                  font=("Microsoft YaHei UI", 10)).pack(pady=(4, 0))
         self._w_var = tk.IntVar(value=self._width)
         tk.Scale(side, from_=1, to=12, orient="horizontal",
@@ -495,19 +496,19 @@ class ScreenshotEditor:
 
         tk.Frame(side, bg="#333355", height=1).pack(fill="x",
                                                      pady=10, padx=6)
-        tk.Button(side, text="↶ 撤销 (Ctrl+Z)", command=self._undo,
+        tk.Button(side, text=_t("shot.btn.undo"), command=self._undo,
                   bg=self.BG3, fg=self.FG, relief="flat",
                   font=("Microsoft YaHei UI", 9),
                   padx=4, pady=5, cursor="hand2",
                   activebackground=self.ACC
                   ).pack(padx=10, pady=2, fill="x")
-        tk.Button(side, text="↷ 重做 (Ctrl+Y)", command=self._redo,
+        tk.Button(side, text=_t("shot.btn.redo"), command=self._redo,
                   bg=self.BG3, fg=self.FG, relief="flat",
                   font=("Microsoft YaHei UI", 9),
                   padx=4, pady=5, cursor="hand2",
                   activebackground=self.ACC
                   ).pack(padx=10, pady=2, fill="x")
-        tk.Button(side, text="🗑 清空标注", command=self._clear_all,
+        tk.Button(side, text=_t("shot.btn.clear"), command=self._clear_all,
                   bg=self.BG3, fg=self.FG, relief="flat",
                   font=("Microsoft YaHei UI", 9),
                   padx=4, pady=5, cursor="hand2",
@@ -533,9 +534,9 @@ class ScreenshotEditor:
         row1.pack(fill="x", padx=12, pady=(6, 0))
         self.lbl_info = tk.Label(
             row1,
-            text=f"原图尺寸 {self.src_img.size[0]}×{self.src_img.size[1]}"
-                 f"  显示比例 {int(self._scale * 100)}%  "
-                 f"·  保存为 JPEG 品质 90",
+            text=_t("shot.info",
+                    w=self.src_img.size[0], h=self.src_img.size[1],
+                    pct=int(self._scale * 100)),
             bg=self.BG2, fg=self.FG_DIM,
             font=("Microsoft YaHei UI", 9))
         self.lbl_info.pack(side="left")
@@ -545,14 +546,14 @@ class ScreenshotEditor:
         row2.pack(fill="x", padx=12, pady=(2, 8))
 
         # 取消
-        tk.Button(row2, text="取消 (Esc)", command=self._on_cancel,
+        tk.Button(row2, text=_t("shot.btn.cancel"), command=self._on_cancel,
                   bg=self.BG3, fg=self.FG, relief="flat",
                   font=("Microsoft YaHei UI", 10), padx=14, pady=6,
                   cursor="hand2", activebackground="#ef5350",
                   activeforeground="#fff"
                   ).pack(side="right", padx=(4, 0), pady=0)
         # 保存
-        tk.Button(row2, text="💾 保存 (Ctrl+S)", command=self._on_save,
+        tk.Button(row2, text=_t("shot.btn.save"), command=self._on_save,
                   bg="#0d7377", fg="#fff", relief="flat",
                   font=("Microsoft YaHei UI", 10, "bold"),
                   padx=16, pady=6, cursor="hand2",
@@ -563,15 +564,14 @@ class ScreenshotEditor:
         path_frame = tk.Frame(row2, bg=self.BG2)
         path_frame.pack(side="left", fill="x", expand=True)
 
-        tk.Label(path_frame, text="文件名：", bg=self.BG2, fg=self.FG_DIM,
+        tk.Label(path_frame, text=_t("shot.filename"), bg=self.BG2, fg=self.FG_DIM,
                  font=("Microsoft YaHei UI", 9)
                  ).pack(side="left")
 
-        # 默认文件名 = HHMMSS_{rand3}_桌面管理
         import random as _rnd
         self._default_basename = (
             f"{datetime.now().strftime('%H%M%S')}_"
-            f"{_rnd.randint(0, 999):03d}_桌面管理"
+            f"{_rnd.randint(0, 999):03d}{_t('shot.tag.suffix')}"
         )
         self._name_var = tk.StringVar(value=self._default_basename)
         self.e_name = tk.Entry(
@@ -639,7 +639,8 @@ class ScreenshotEditor:
         ix, iy = self._to_img_coord(e.x, e.y)
 
         if self._tool == "text":
-            txt = simpledialog.askstring("添加文字", "请输入文字内容：",
+            txt = simpledialog.askstring(_t("shot.text.dialog.title"),
+                                         _t("shot.text.dialog.prompt"),
                                          parent=self.win)
             if txt:
                 self._annots.append(_Annotation(
@@ -696,7 +697,7 @@ class ScreenshotEditor:
     def _clear_all(self):
         if not self._annots:
             return
-        if messagebox.askyesno("确认", "清空所有标注？", parent=self.win):
+        if messagebox.askyesno(_t("common.confirm"), _t("shot.confirm.clear"), parent=self.win):
             self._redo_stack.extend(reversed(self._annots))
             self._annots.clear()
             self._render()
@@ -843,7 +844,7 @@ class ScreenshotEditor:
             final.save(path, "JPEG", quality=90, optimize=True)
             _log(f"saved → {path}")
         except Exception as ex:
-            messagebox.showerror("保存失败", str(ex), parent=self.win)
+            messagebox.showerror(_t("shot.save_failed"), str(ex), parent=self.win)
             return
         self._close()
         if self.on_done:
@@ -890,8 +891,8 @@ class ScreenshotEditor:
 
     def _on_cancel(self, _e=None):
         if self._annots and \
-                not messagebox.askyesno("放弃",
-                                        "有未保存的标注，确定放弃？",
+                not messagebox.askyesno(_t("common.confirm"),
+                                        _t("shot.cancel.confirm"),
                                         parent=self.win):
             return
         self._close()
