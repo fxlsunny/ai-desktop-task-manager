@@ -13,7 +13,21 @@ import config as cfg_mod
 TASKS_FILE = "tasks.json"
 
 PRIORITY_COLORS = {1: "#78909c", 2: "#4fc3f7", 3: "#ffb74d", 4: "#ef5350"}
+
+# 优先级标签 - 兼容旧调用：保留 dict 形态，但也提供 priority_label() 函数
+# 旧代码 PRIORITY_LABELS[p] 仍然可用（取中文）；新代码请用 priority_label(p)
 PRIORITY_LABELS = {1: "低", 2: "中", 3: "高", 4: "紧急"}
+
+_PRI_KEYS = {1: "pri.low", 2: "pri.mid", 3: "pri.high", 4: "pri.urgent"}
+
+
+def priority_label(p: int) -> str:
+    """根据当前 i18n 语言返回优先级标签"""
+    try:
+        from i18n import t as _t
+        return _t(_PRI_KEYS.get(int(p), "pri.mid"))
+    except Exception:
+        return PRIORITY_LABELS.get(int(p), "中")
 
 
 class Task:
