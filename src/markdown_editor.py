@@ -15,6 +15,8 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import ttk, font as tkfont
 
+from i18n import t as _t
+
 # 图片预览依赖（可选）
 try:
     from PIL import Image, ImageTk
@@ -126,7 +128,7 @@ class _MarkdownRenderer:
         w.configure(state="normal")
         w.delete("1.0", "end")
         if not md.strip():
-            w.insert("1.0", "（预览为空）\n", ("body",))
+            w.insert("1.0", _t("common.preview_empty") + "\n", ("body",))
             w.configure(state="disabled")
             return
 
@@ -297,7 +299,7 @@ class _MarkdownRenderer:
         """在预览 Text 中插入本地图片；加载失败则写占位文本"""
         w = self.w
         if not _HAS_PIL:
-            w.insert("end", f"[图片 需要安装 Pillow] {path_str}\n", ("body",))
+            w.insert("end", _t("md.image_no_pil", path=path_str) + "\n", ("body",))
             return
 
         # 路径解析：绝对 / 相对 base_dir / 相对 CWD
@@ -314,7 +316,7 @@ class _MarkdownRenderer:
 
         if not p.exists():
             w.insert("end",
-                     f"⚠️ 图片未找到: {path_str}\n",
+                     _t("md.image_missing", path=path_str) + "\n",
                      ("body",))
             return
 
@@ -333,7 +335,7 @@ class _MarkdownRenderer:
             tk_img = ImageTk.PhotoImage(img)
         except Exception as e:
             w.insert("end",
-                     f"⚠️ 图片加载失败: {path_str} ({e})\n",
+                     _t("md.image_failed", path=path_str, e=e) + "\n",
                      ("body",))
             return
 
@@ -358,10 +360,12 @@ class MarkdownEditor:
 
     @classmethod
     def open(cls, parent: tk.Misc, initial_text: str = "",
-             title: str = "📝 任务内容编辑",
+             title: str | None = None,
              on_save=None,
              image_base_dir: Path | str | None = None,
              on_screenshot=None) -> "MarkdownEditor":
+        if title is None:
+            title = _t("edit.window.title", hint=_t("edit.title.hint"))
         """
         parent          : 父窗口（通常是任务管理 Toplevel）
         initial_text    : 打开时要回填的文本
@@ -434,9 +438,9 @@ class MarkdownEditor:
         left.pack(side="left", padx=10)
 
         self._view_var = tk.StringVar(value="split")
-        for val, txt in [("edit", "✏️ 编辑"),
-                         ("split", "🗂 分屏"),
-                         ("preview", "👁 预览")]:
+        for val, txt in [("edit",    _t("md.view.edit")),
+                         ("split",   _t("md.view.split")),
+                         ("preview", _t("md.view.preview"))]:
             tk.Radiobutton(
                 left, text=txt, variable=self._view_var, value=val,
                 command=self._switch_view,
@@ -449,7 +453,7 @@ class MarkdownEditor:
         # 中：字号调节
         mid = tk.Frame(bar, bg=BG2)
         mid.pack(side="left", padx=20)
-        tk.Label(mid, text="字号:", bg=BG2, fg=FG_DIM,
+        tk.Label(mid, text=_t("md.font.label"), bg=BG2, fg=FG_DIM,
                  font=("Microsoft YaHei UI", 9)).pack(side="left")
         tk.Button(mid, text="A-", command=lambda: self._zoom(-1),
                   bg=BG3, fg=FG, relief="flat", padx=8, cursor="hand2",
@@ -473,7 +477,7 @@ class MarkdownEditor:
                                   font=("Microsoft YaHei UI", 9))
         self.lbl_stats.pack(side="right", padx=10)
 
-        tk.Button(right, text="🔍 搜索 (Ctrl+F)",
+        tk.Button(right, text=_t("md.btn.search"),
                   command=self._toggle_search,
                   bg=BG3, fg=FG, relief="flat", padx=10, pady=4,
                   cursor="hand2",
@@ -482,7 +486,7 @@ class MarkdownEditor:
 
         # 截图按钮（仅当调用方提供了 on_screenshot 时显示）
         if self.on_screenshot is not None:
-            tk.Button(right, text="📷 截图 (Ctrl+Shift+A)",
+            tk.Button(right, text=_t("md.btn.shot"),
                       command=self._trigger_screenshot,
                       bg="#7c4dff", fg="#fff", relief="flat",
                       padx=10, pady=4, cursor="hand2",
@@ -506,19 +510,18 @@ class MarkdownEditor:
         self.e_search.pack(side="left", padx=4, pady=6, ipady=3)
         self.search_var.trace_add("write", lambda *_: self._on_search_change())
 
-        tk.Button(self.search_frame, text="▲ 上一处",
+        tk.Button(self.search_frame, text=_t("md.find.prev"),
                   command=lambda: self._search_next(-1),
                   bg=BG2, fg=FG, relief="flat", padx=8, cursor="hand2",
                   font=("Microsoft YaHei UI", 9),
                   activebackground=ACC).pack(side="left", padx=2, pady=6)
-        tk.Button(self.search_frame, text="▼ 下一处",
+        tk.Button(self.search_frame, text=_t("md.find.next"),
                   command=lambda: self._search_next(1),
                   bg=BG2, fg=FG, relief="flat", padx=8, cursor="hand2",
                   font=("Microsoft YaHei UI", 9),
                   activebackground=ACC).pack(side="left", padx=2, pady=6)
 
-        # 替换输入
-        tk.Label(self.search_frame, text="  替换为：", bg=BG3, fg=FG_DIM,
+        tk.Label(self.search_frame, text=_t("md.replace.label"), bg=BG3, fg=FG_DIM,
                  font=("Microsoft YaHei UI", 9)).pack(side="left", padx=(12, 2))
         self.replace_var = tk.StringVar()
         self.e_replace = tk.Entry(self.search_frame, textvariable=self.replace_var,
@@ -527,20 +530,19 @@ class MarkdownEditor:
                                   width=24)
         self.e_replace.pack(side="left", padx=4, pady=6, ipady=3)
 
-        tk.Button(self.search_frame, text="替换当前",
+        tk.Button(self.search_frame, text=_t("md.replace.cur"),
                   command=self._replace_cur,
                   bg=BG2, fg=FG, relief="flat", padx=8, cursor="hand2",
                   font=("Microsoft YaHei UI", 9),
                   activebackground=ACC).pack(side="left", padx=2, pady=6)
-        tk.Button(self.search_frame, text="全部替换",
+        tk.Button(self.search_frame, text=_t("md.replace.all"),
                   command=self._replace_all,
                   bg=BG2, fg=FG, relief="flat", padx=8, cursor="hand2",
                   font=("Microsoft YaHei UI", 9),
                   activebackground=ORANGE).pack(side="left", padx=2, pady=6)
 
-        # 大小写敏感
         self.case_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(self.search_frame, text="区分大小写",
+        tk.Checkbutton(self.search_frame, text=_t("md.case_sensitive"),
                        variable=self.case_var,
                        command=self._on_search_change,
                        bg=BG3, fg=FG_DIM,
@@ -572,7 +574,7 @@ class MarkdownEditor:
 
         edit_head = tk.Frame(self.edit_panel, bg=BG)
         edit_head.pack(fill="x", padx=2, pady=(2, 0))
-        tk.Label(edit_head, text="✏️ 编辑", bg=BG, fg=ACC,
+        tk.Label(edit_head, text=_t("md.editor.label"), bg=BG, fg=ACC,
                  font=("Microsoft YaHei UI", 10, "bold")
                  ).pack(side="left")
 
@@ -608,7 +610,7 @@ class MarkdownEditor:
 
         prev_head = tk.Frame(self.prev_panel, bg=BG)
         prev_head.pack(fill="x", padx=2, pady=(2, 0))
-        tk.Label(prev_head, text="👁 Markdown 预览", bg=BG, fg=ACC2,
+        tk.Label(prev_head, text=_t("md.preview.label"), bg=BG, fg=ACC2,
                  font=("Microsoft YaHei UI", 10, "bold")
                  ).pack(side="left")
 
@@ -636,17 +638,17 @@ class MarkdownEditor:
         bar.pack_propagate(False)
 
         # 提示
-        tk.Label(bar, text="💡 Ctrl+F 搜索  |  Ctrl+H 替换  |  Ctrl+S 保存  |  Esc 关闭",
+        tk.Label(bar, text=_t("md.bottom.hint"),
                  bg=BG2, fg=FG_DIM,
                  font=("Microsoft YaHei UI", 9)
                  ).pack(side="left", padx=14)
 
-        tk.Button(bar, text="取消", command=self._on_cancel,
+        tk.Button(bar, text=_t("common.cancel"), command=self._on_cancel,
                   bg=BG3, fg=FG, relief="flat", padx=16, pady=4,
                   cursor="hand2", font=("Microsoft YaHei UI", 10),
                   activebackground=RED, activeforeground="#fff"
                   ).pack(side="right", padx=(4, 12), pady=8)
-        tk.Button(bar, text="✔ 保存并关闭", command=self._on_save,
+        tk.Button(bar, text=_t("md.btn.save_close"), command=self._on_save,
                   bg="#0d7377", fg="#fff", relief="flat", padx=16, pady=4,
                   cursor="hand2", font=("Microsoft YaHei UI", 10, "bold"),
                   activebackground="#14a085", activeforeground="#fff"
@@ -702,8 +704,8 @@ class MarkdownEditor:
                     traceback.print_exc()
                     from tkinter import messagebox
                     messagebox.showerror(
-                        "插入失败",
-                        f"图片已保存到 {path}\n但插入失败: {e}",
+                        _t("md.insert_failed"),
+                        _t("md.insert_failed_body", path=path, e=e),
                         parent=self.win)
 
         try:
@@ -718,7 +720,7 @@ class MarkdownEditor:
             except Exception:
                 pass
             from tkinter import messagebox
-            messagebox.showerror("截图失败", str(e), parent=self.win)
+            messagebox.showerror(_t("md.shot_failed"), str(e), parent=self.win)
 
     def insert_image(self, image_path: str):
         """把一张本地图片以 Markdown 语法插入编辑器当前光标位置"""
@@ -733,7 +735,7 @@ class MarkdownEditor:
         else:
             md_path = p.as_posix()
 
-        alt = f"截图_{p.stem}"
+        alt = f"{_t('shot.alt_prefix')}{p.stem}"
         snippet = f"\n![{alt}]({md_path})\n"
 
         # 插入到光标位置（若编辑器还未聚焦则插到末尾）
@@ -821,14 +823,14 @@ class MarkdownEditor:
         except Exception as e:
             self.preview.configure(state="normal")
             self.preview.delete("1.0", "end")
-            self.preview.insert("1.0", f"[预览渲染失败] {e}")
+            self.preview.insert("1.0", f"[Markdown render error] {e}")
             self.preview.configure(state="disabled")
 
     def _update_stats(self):
         text = self.editor.get("1.0", "end-1c")
         chars = len(text)
         lines = text.count("\n") + (0 if text.endswith("\n") or not text else 1)
-        self.lbl_stats.config(text=f"{lines} 行  |  {chars} 字符")
+        self.lbl_stats.config(text=_t("md.stats", lines=lines, chars=chars))
 
     # ══════════════════════════════════════════════════════
     # 搜索 / 替换
@@ -882,7 +884,7 @@ class MarkdownEditor:
             self.lbl_search_count.config(
                 text=f"1 / {len(matches)}", fg=YELLOW)
         else:
-            self.lbl_search_count.config(text="未找到", fg=RED)
+            self.lbl_search_count.config(text=_t("md.find.none"), fg=RED)
 
     def _search_next(self, step: int):
         if not self._search_matches:
@@ -935,7 +937,7 @@ class MarkdownEditor:
                                  content, flags=re.IGNORECASE)
 
         if count == 0:
-            self.lbl_search_count.config(text="未找到", fg=RED)
+            self.lbl_search_count.config(text=_t("md.find.none"), fg=RED)
             return
 
         # 整体替换并保持光标位置
@@ -947,7 +949,7 @@ class MarkdownEditor:
         except Exception:
             pass
 
-        self.lbl_search_count.config(text=f"已替换 {count} 处", fg=GREEN)
+        self.lbl_search_count.config(text=_t("md.find.replaced", n=count), fg=GREEN)
         self._on_search_change()
 
     # ══════════════════════════════════════════════════════
