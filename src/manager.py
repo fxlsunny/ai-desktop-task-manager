@@ -8,15 +8,22 @@ from datetime import datetime
 from pathlib import Path
 
 import config as cfg_mod
-from models import Store, Task, PRIORITY_LABELS, PRIORITY_COLORS
+import i18n
+from i18n import t as _t
+from models import Store, Task, priority_label, PRIORITY_COLORS
 
-# 优先级元数据（值, 标签, 颜色, 说明）
-PRI_META = [
-    (4, "紧急", "#ef5350", "⚠ 立即行动"),
-    (3, "高",   "#ffb74d", "● 优先处理"),
-    (2, "中",   "#4fc3f7", "◑ 正常安排"),
-    (1, "低",   "#78909c", "○ 可以推迟"),
+# 优先级元数据（值, 颜色, i18n key 标签, i18n key 说明）
+PRI_META_RAW = [
+    (4, "#ef5350", "pri.urgent", "pri.urgent.tip"),
+    (3, "#ffb74d", "pri.high",   "pri.high.tip"),
+    (2, "#4fc3f7", "pri.mid",    "pri.mid.tip"),
+    (1, "#78909c", "pri.low",    "pri.low.tip"),
 ]
+
+
+def _pri_meta():
+    """返回 [(val, lang_label, color, lang_tip), ...]，每次调用按当前语言渲染"""
+    return [(v, _t(lk), c, _t(tk)) for v, c, lk, tk in PRI_META_RAW]
 
 BG      = "#1e1e2e"
 BG2     = "#2a2a3e"
@@ -56,7 +63,7 @@ class ManagerWin:
         self._edit_task: Task | None = None
 
         self.win = tk.Toplevel(root)
-        self.win.title("桌面任务管家 · 管理")
+        self.win.title(_t("manager.title"))
         # ★ 加大默认窗口尺寸，保证右列内容完整显示
         self.win.geometry("980x640")
         self.win.minsize(860, 560)
@@ -97,11 +104,11 @@ class ManagerWin:
         self.tab_cfg   = tk.Frame(self.nb, bg=BG)
         self.tab_bkp   = tk.Frame(self.nb, bg=BG)
 
-        self.nb.add(self.tab_list,  text="📋 任务列表")
-        self.nb.add(self.tab_edit,  text="✏️ 新建/编辑")
-        self.nb.add(self.tab_trash, text="🗑 回收站")
-        self.nb.add(self.tab_cfg,   text="⚙️ 设置")
-        self.nb.add(self.tab_bkp,   text="💾 备份/恢复")
+        self.nb.add(self.tab_list,  text=_t("manager.tab.list"))
+        self.nb.add(self.tab_edit,  text=_t("manager.tab.edit"))
+        self.nb.add(self.tab_trash, text=_t("manager.tab.trash"))
+        self.nb.add(self.tab_cfg,   text=_t("manager.tab.cfg"))
+        self.nb.add(self.tab_bkp,   text=_t("manager.tab.bkp"))
 
         self._build_list_tab()
         self._build_edit_tab()
@@ -116,12 +123,11 @@ class ManagerWin:
         bar = tk.Frame(self.tab_list, bg=BG)
         bar.pack(fill="x", padx=6, pady=(6, 2))
 
-        _btn(bar, "＋ 新建",  self._new_task).pack(side="left", padx=2)
-        _btn(bar, "✏️ 编辑",  self._edit_sel).pack(side="left", padx=2)
-        _btn(bar, "✔ 完成",  self._toggle_sel).pack(side="left", padx=2)
-        _btn(bar, "🗑 删除",  self._delete_sel, danger=True).pack(side="left", padx=2)
+        _btn(bar, _t("manager.btn.new"),    self._new_task).pack(side="left", padx=2)
+        _btn(bar, _t("manager.btn.edit"),   self._edit_sel).pack(side="left", padx=2)
+        _btn(bar, _t("manager.btn.toggle"), self._toggle_sel).pack(side="left", padx=2)
+        _btn(bar, _t("manager.btn.delete"), self._delete_sel, danger=True).pack(side="left", padx=2)
 
-        # 搜索
         tk.Label(bar, text="🔍", bg=BG, fg=FG_DIM).pack(side="right")
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", lambda *a: self._load_list())
@@ -129,12 +135,25 @@ class ManagerWin:
                  insertbackground="#fff", relief="flat", width=14,
                  font=("Microsoft YaHei UI", 10)).pack(side="right", padx=4)
 
-        # 筛选
-        tk.Label(bar, text="筛选:", bg=BG, fg=FG_DIM,
+        tk.Label(bar, text=_t("manager.filter.label"), bg=BG, fg=FG_DIM,
                  font=("Microsoft YaHei UI", 10)).pack(side="left", padx=(12, 2))
-        self.filter_var = tk.StringVar(value="待办")
-        flt = ttk.Combobox(bar, textvariable=self.filter_var, width=8,
-                           values=["全部", "待办", "已完成", "紧急", "高", "中", "低"],
+
+        # 筛选下拉的实际值用 id（all/todo/done/p4/p3/p2/p1）；显示用 i18n 标签
+        self._filter_options = [
+            ("all",  _t("manager.filter.all")),
+            ("todo", _t("manager.filter.todo")),
+            ("done", _t("manager.filter.done")),
+            ("p4",   _t("pri.urgent")),
+            ("p3",   _t("pri.high")),
+            ("p2",   _t("pri.mid")),
+            ("p1",   _t("pri.low")),
+        ]
+        self._filter_label_to_id = {lbl: fid for fid, lbl in self._filter_options}
+        # 默认显示"待办"
+        default_label = _t("manager.filter.todo")
+        self.filter_var = tk.StringVar(value=default_label)
+        flt = ttk.Combobox(bar, textvariable=self.filter_var, width=10,
+                           values=[lbl for _, lbl in self._filter_options],
                            state="readonly", font=("Microsoft YaHei UI", 10))
         flt.pack(side="left")
         flt.bind("<<ComboboxSelected>>", lambda e: self._load_list())
@@ -144,15 +163,15 @@ class ManagerWin:
         self.tree = ttk.Treeview(self.tab_list, columns=cols,
                                  show="headings", selectmode="browse")
         headers = {
-            "title":    ("任务标题",  160),
-            "priority": ("优先级",    62),
-            "progress": ("进度",      58),
-            "status":   ("状态",      64),
-            "elapsed":  ("耗时(天)",  62),
-            "alarm":    ("提醒时间", 108),
-            "tags":     ("标签",      80),
-            "created":  ("创建时间", 110),
-            "updated":  ("更新时间", 110),
+            "title":    (_t("manager.col.title"),    160),
+            "priority": (_t("manager.col.priority"),  62),
+            "progress": (_t("manager.col.progress"),  58),
+            "status":   (_t("manager.col.status"),    64),
+            "elapsed":  (_t("manager.col.elapsed"),   62),
+            "alarm":    (_t("manager.col.alarm"),    108),
+            "tags":     (_t("manager.col.tags"),      80),
+            "created":  (_t("manager.col.created"),  110),
+            "updated":  (_t("manager.col.updated"),  110),
         }
         for col,(hdr,w) in headers.items():
             self.tree.heading(col, text=hdr, command=lambda c=col: self._sort_by(c))
@@ -185,17 +204,18 @@ class ManagerWin:
 
     def _load_list(self):
         self.tree.delete(*self.tree.get_children())
-        flt = self.filter_var.get()
+        flt_label = self.filter_var.get()
+        flt = self._filter_label_to_id.get(flt_label, "todo")
         kw  = self.search_var.get().strip().lower()
         tasks = self.store.all()   # 不含软删除
 
         def _match(t: Task) -> bool:
-            if flt == "待办"   and t.completed:     return False
-            if flt == "已完成" and not t.completed: return False
-            if flt == "紧急"   and t.priority != 4: return False
-            if flt == "高"     and t.priority != 3: return False
-            if flt == "中"     and t.priority != 2: return False
-            if flt == "低"     and t.priority != 1: return False
+            if flt == "todo" and t.completed:     return False
+            if flt == "done" and not t.completed: return False
+            if flt == "p4"   and t.priority != 4: return False
+            if flt == "p3"   and t.priority != 3: return False
+            if flt == "p2"   and t.priority != 2: return False
+            if flt == "p1"   and t.priority != 1: return False
             if kw and kw not in (t.title+t.content+t.tags).lower(): return False
             return True
 
@@ -216,11 +236,12 @@ class ManagerWin:
         for t in tasks:
             alarm_str   = (f"{t.alarm_date} {t.alarm_time}".strip()
                            if t.alarm_date else t.alarm_time)
-            status_str  = "✔ 已完成" if t.completed else "○ 待办"
+            status_str  = _t("manager.status.done") if t.completed else _t("manager.status.todo")
             prog_str    = f"{t.progress}%" if t.progress else "—"
-            elapsed_str = f"{t.elapsed_days}天" if t.elapsed_days > 0 else "今天"
+            elapsed_str = (_t("overlay.today") if t.elapsed_days == 0
+                           else _t("overlay.days", n=t.elapsed_days))
             pri_icon    = {4:"⚠",3:"●",2:"◑",1:"○"}.get(t.priority,"◑")
-            pri_str     = f"{pri_icon} {PRIORITY_LABELS[t.priority]}"
+            pri_str     = f"{pri_icon} {priority_label(t.priority)}"
             tag = ("done" if t.completed
                    else {4:"urgent",3:"high",2:"mid",1:"low"}.get(t.priority,"mid"))
             self.tree.insert("","end", iid=t.task_id, tags=(tag,),
@@ -247,23 +268,24 @@ class ManagerWin:
             pm.add_command(
                 label=f"{'✔ ' if t.progress==pct else '   '}{pct}%",
                 command=lambda p=pct,tid=sel: self._quick_progress(tid,p))
-        menu.add_cascade(label=f"📊 设置进度  (当前{t.progress}%)", menu=pm)
-        # 优先级子菜单
+        menu.add_cascade(label=_t("manager.ctx.set_progress", pct=t.progress), menu=pm)
         qm = tk.Menu(menu, tearoff=0, bg=BG, fg=FG,
                      activebackground=BG3, activeforeground=ACC,
                      font=("Microsoft YaHei UI", 10))
-        for val,lbl,color,tip in PRI_META:
+        for val,lbl,color,tip in _pri_meta():
             qm.add_command(
                 label=f"{'✔ ' if t.priority==val else '   '}{lbl} {tip}",
                 foreground=color,
                 command=lambda v=val,tid=sel: self._quick_priority(tid,v))
-        menu.add_cascade(label=f"🔥 设置优先级  (当前{PRIORITY_LABELS[t.priority]})", menu=qm)
+        menu.add_cascade(
+            label=_t("manager.ctx.set_priority", label=priority_label(t.priority)),
+            menu=qm)
         menu.add_separator()
-        toggle_lbl = "○ 标记为待办" if t.completed else "✔ 标记为完成"
-        menu.add_command(label=toggle_lbl,   command=self._toggle_sel)
+        toggle_lbl = _t("manager.ctx.mark_todo") if t.completed else _t("manager.ctx.mark_done")
+        menu.add_command(label=toggle_lbl, command=self._toggle_sel)
         menu.add_separator()
-        menu.add_command(label="✏️ 编辑任务", command=self._edit_sel)
-        menu.add_command(label="🗑 移入回收站", command=self._delete_sel,
+        menu.add_command(label=_t("manager.ctx.edit"),  command=self._edit_sel)
+        menu.add_command(label=_t("manager.ctx.trash"), command=self._delete_sel,
                          foreground=RED)
         menu.post(event.x_root, event.y_root)
 
@@ -295,16 +317,16 @@ class ManagerWin:
         btn_row = tk.Frame(self.tab_edit, bg=BG)
         btn_row.pack(side="bottom", fill="x", padx=10, pady=6)
 
-        _btn(btn_row, "💾 保存任务", self._save_task,
+        _btn(btn_row, _t("edit.btn.save"), self._save_task,
              font=("Microsoft YaHei UI",11,"bold"), padx=16, pady=6,
              bg="#0d7377", fg="#fff", activebackground="#14a085",
              activeforeground="#fff").pack(side="left", padx=4)
-        _btn(btn_row, "🗑 清空表单", self._clear_form,
+        _btn(btn_row, _t("edit.btn.clear"), self._clear_form,
              padx=12, pady=6).pack(side="left", padx=4)
         self.lbl_save_msg = tk.Label(btn_row, text="", bg=BG, fg=ACC,
                                      font=("Microsoft YaHei UI", 10))
         self.lbl_save_msg.pack(side="left", padx=8)
-        tk.Label(btn_row, text="Ctrl+S 保存", bg=BG, fg="#555",
+        tk.Label(btn_row, text=_t("edit.hint.shortcut"), bg=BG, fg="#555",
                  font=("Microsoft YaHei UI", 9)).pack(side="right", padx=8)
 
         # ── 编辑状态提示条 ─────────────────────────────────────
@@ -323,23 +345,22 @@ class ManagerWin:
         left = tk.Frame(self.tab_edit, bg=BG)
         left.pack(side="left", fill="both", expand=True, padx=(8,4), pady=8)
 
-        tk.Label(left, text="任务标题 *", **lbl_s).pack(fill="x")
+        tk.Label(left, text=_t("edit.title.label"), **lbl_s).pack(fill="x")
         self.e_title = tk.Entry(left, **entry_s)
         self.e_title.pack(fill="x", **pad)
 
-        # ── 任务内容（附带「放大编辑 + Markdown 预览」入口）──
         content_head = tk.Frame(left, bg=BG)
         content_head.pack(fill="x", pady=(2, 0))
-        tk.Label(content_head, text="任务内容  (支持 Markdown)", **lbl_s
+        tk.Label(content_head, text=_t("edit.content.label"), **lbl_s
                  ).pack(side="left")
-        tk.Button(content_head, text="🔍 放大编辑",
+        tk.Button(content_head, text=_t("edit.btn.expand"),
                   command=self._open_content_editor,
                   bg=BG3, fg=ACC, relief="flat",
                   font=("Microsoft YaHei UI", 9),
                   padx=10, pady=1, cursor="hand2",
                   activebackground=ACC, activeforeground="#fff"
                   ).pack(side="right", padx=4)
-        tk.Button(content_head, text="📷 截图",
+        tk.Button(content_head, text=_t("edit.btn.shot"),
                   command=self._quick_screenshot_to_content,
                   bg=PURPLE, fg="#fff", relief="flat",
                   font=("Microsoft YaHei UI", 9, "bold"),
@@ -348,19 +369,18 @@ class ManagerWin:
                   ).pack(side="right", padx=4)
         self.e_content = tk.Text(left, height=5, wrap="word", **entry_s)
         self.e_content.pack(fill="x", **pad)
-        # 双击内容区也能打开放大编辑
         self.e_content.bind("<Double-Button-1>",
                             lambda _e: self._open_content_editor())
 
-        tk.Label(left, text="目标", **lbl_s).pack(fill="x")
+        tk.Label(left, text=_t("edit.goal.label"), **lbl_s).pack(fill="x")
         self.e_goal = tk.Entry(left, **entry_s)
         self.e_goal.pack(fill="x", **pad)
 
-        tk.Label(left, text="问题/障碍", **lbl_s).pack(fill="x")
+        tk.Label(left, text=_t("edit.problem.label"), **lbl_s).pack(fill="x")
         self.e_problem = tk.Entry(left, **entry_s)
         self.e_problem.pack(fill="x", **pad)
 
-        tk.Label(left, text="标签（逗号分隔）", **lbl_s).pack(fill="x")
+        tk.Label(left, text=_t("edit.tags.label"), **lbl_s).pack(fill="x")
         self.e_tags = tk.Entry(left, **entry_s)
         self.e_tags.pack(fill="x", **pad)
 
@@ -398,11 +418,10 @@ class ManagerWin:
 
         sep = dict(bg="#333355", height=1)
 
-        # ── 轻重缓急 ──────────────────────────────────────────
-        tk.Label(right, text="⚡ 轻重缓急", bg=BG, fg=ACC,
+        tk.Label(right, text=_t("edit.priority.section"), bg=BG, fg=ACC,
                  font=("Microsoft YaHei UI", 10, "bold"), anchor="w").pack(fill="x", padx=6, pady=(8,2))
         self.pri_var = tk.IntVar(value=2)
-        for val, lbl_text, color, tip in PRI_META:
+        for val, lbl_text, color, tip in _pri_meta():
             row_f = tk.Frame(right, bg=BG)
             row_f.pack(fill="x", padx=4, pady=1)
             tk.Radiobutton(
@@ -416,24 +435,22 @@ class ManagerWin:
             tk.Label(row_f, text=tip, bg=BG, fg="#666",
                      font=("Microsoft YaHei UI", 8)).pack(side="left", padx=4)
 
-        # ── 完成状态 ──────────────────────────────────────────
         tk.Frame(right, **sep).pack(fill="x", padx=6, pady=(8,4))
-        tk.Label(right, text="✅ 完成状态", bg=BG, fg=ACC,
+        tk.Label(right, text=_t("edit.completed.section"), bg=BG, fg=ACC,
                  font=("Microsoft YaHei UI", 10, "bold"), anchor="w").pack(fill="x", padx=6, pady=(0,2))
         self.completed_var = tk.BooleanVar(value=False)
         tk.Checkbutton(
-            right, text="  标记为已完成",
+            right, text=_t("edit.completed.checkbox"),
             variable=self.completed_var,
             bg=BG, fg=GREEN, selectcolor=BG3,
             activebackground=BG, activeforeground=GREEN,
             font=("Microsoft YaHei UI", 10),
         ).pack(anchor="w", padx=10)
 
-        # ── 任务进度 ──────────────────────────────────────────
         tk.Frame(right, **sep).pack(fill="x", padx=6, pady=(8,4))
         prog_hdr = tk.Frame(right, bg=BG)
         prog_hdr.pack(fill="x", padx=6)
-        tk.Label(prog_hdr, text="📊 任务进度", bg=BG, fg=ACC,
+        tk.Label(prog_hdr, text=_t("edit.progress.section"), bg=BG, fg=ACC,
                  font=("Microsoft YaHei UI", 10, "bold")).pack(side="left")
         self.lbl_progress = tk.Label(prog_hdr, text="0%", bg=BG,
                                      fg=ACC, font=("Microsoft YaHei UI", 10, "bold"))
@@ -466,36 +483,34 @@ class ManagerWin:
                       cursor="hand2", activebackground=ACC,
                       activeforeground="#000").pack(side="left", padx=1)
 
-        # ── 提醒时间 ──────────────────────────────────────────
         tk.Frame(right, **sep).pack(fill="x", padx=6, pady=(8,4))
-        tk.Label(right, text="⏰ 提醒设置", bg=BG, fg=ACC,
+        tk.Label(right, text=_t("edit.alarm.section"), bg=BG, fg=ACC,
                  font=("Microsoft YaHei UI", 10, "bold"), anchor="w").pack(fill="x", padx=6, pady=(0,2))
 
-        tk.Label(right, text="提醒日期（留空=每天）", bg=BG, fg=FG_DIM,
+        tk.Label(right, text=_t("edit.alarm.date_label"), bg=BG, fg=FG_DIM,
                  font=("Microsoft YaHei UI", 9), anchor="w").pack(fill="x", padx=10)
         self.e_alarm_date = tk.Entry(right, bg=BG2, fg=FG,
                                      insertbackground="#fff", relief="flat",
                                      font=("Microsoft YaHei UI", 10))
-        self.e_alarm_date.insert(0, "YYYY-MM-DD")
+        self.e_alarm_date.insert(0, _t("edit.placeholder.date"))
         self.e_alarm_date.pack(fill="x", padx=10, pady=(2,4))
 
-        tk.Label(right, text="提醒时间（HH:MM）", bg=BG, fg=FG_DIM,
+        tk.Label(right, text=_t("edit.alarm.time_label"), bg=BG, fg=FG_DIM,
                  font=("Microsoft YaHei UI", 9), anchor="w").pack(fill="x", padx=10)
         self.e_alarm_time = tk.Entry(right, bg=BG2, fg=FG,
                                      insertbackground="#fff", relief="flat",
                                      font=("Microsoft YaHei UI", 10))
         self.e_alarm_time.pack(fill="x", padx=10, pady=(2,4))
-        tk.Label(right, text="例：09:30", bg=BG, fg="#555",
+        tk.Label(right, text=_t("edit.alarm.example"), bg=BG, fg="#555",
                  font=("Microsoft YaHei UI", 8)).pack(anchor="w", padx=12)
 
-        # 日期占位符交互
         def _cp(entry, ph):
             entry.bind("<FocusIn>",
                        lambda e: entry.delete(0,"end") if entry.get()==ph else None)
             entry.bind("<FocusOut>",
                        lambda e: (entry.delete(0,"end") or entry.insert(0,ph))
                        if not entry.get().strip() else None)
-        _cp(self.e_alarm_date, "YYYY-MM-DD")
+        _cp(self.e_alarm_date, _t("edit.placeholder.date"))
 
         # 底部留白
         tk.Frame(right, bg=BG, height=12).pack()
@@ -524,9 +539,9 @@ class ManagerWin:
         bar = tk.Frame(self.tab_trash, bg=BG)
         bar.pack(fill="x", padx=6, pady=(6,2))
 
-        _btn(bar, "♻ 恢复选中", self._restore_sel).pack(side="left", padx=2)
-        _btn(bar, "💀 永久删除", self._purge_sel, danger=True).pack(side="left", padx=2)
-        _btn(bar, "🗑 清空回收站", self._purge_all, danger=True).pack(side="left", padx=8)
+        _btn(bar, _t("trash.btn.restore"),    self._restore_sel).pack(side="left", padx=2)
+        _btn(bar, _t("trash.btn.purge"),       self._purge_sel,   danger=True).pack(side="left", padx=2)
+        _btn(bar, _t("trash.btn.purge_all"),   self._purge_all,   danger=True).pack(side="left", padx=8)
         self.lbl_trash_count = tk.Label(bar, text="", bg=BG, fg=FG_DIM,
                                         font=("Microsoft YaHei UI", 9))
         self.lbl_trash_count.pack(side="right", padx=8)
@@ -535,12 +550,12 @@ class ManagerWin:
         self.trash_tree = ttk.Treeview(self.tab_trash, columns=cols,
                                        show="headings", selectmode="browse")
         th = {
-            "title":      ("任务标题",   200),
-            "priority":   ("优先级",      62),
-            "status":     ("原状态",      70),
-            "elapsed":    ("创建耗时",    70),
-            "deleted_at": ("删除时间",   120),
-            "created":    ("创建时间",   120),
+            "title":      (_t("manager.col.title"),     200),
+            "priority":   (_t("manager.col.priority"),   62),
+            "status":     (_t("trash.col.original"),     70),
+            "elapsed":    (_t("trash.col.elapsed"),      70),
+            "deleted_at": (_t("trash.col.deleted_at"),  120),
+            "created":    (_t("manager.col.created"),  120),
         }
         for col,(hdr,w) in th.items():
             self.trash_tree.heading(col, text=hdr)
@@ -566,20 +581,22 @@ class ManagerWin:
         tasks = self.store.deleted()
         tasks.sort(key=lambda t: t.deleted_at, reverse=True)
         for t in tasks:
-            status_str = "✔ 已完成" if t.completed else "○ 待办"
-            elapsed_str = f"{t.elapsed_days}天" if t.elapsed_days > 0 else "今天"
-            pri_str = f"{PRIORITY_LABELS[t.priority]}"
+            status_str = _t("manager.status.done") if t.completed else _t("manager.status.todo")
+            elapsed_str = (_t("overlay.today") if t.elapsed_days == 0
+                           else _t("overlay.days", n=t.elapsed_days))
+            pri_str = priority_label(t.priority)
             self.trash_tree.insert("","end", iid=t.task_id, tags=("deleted",),
                                    values=(t.title, pri_str, status_str,
                                            elapsed_str, t.deleted_at, t.created_at))
         n = len(tasks)
         self.lbl_trash_count.config(
-            text=f"回收站共 {n} 条" if n > 0 else "回收站为空")
+            text=_t("trash.count", n=n) if n > 0 else _t("trash.empty"))
 
     def _restore_sel(self):
         sel = self.trash_tree.selection()
         if not sel:
-            messagebox.showinfo("提示", "请先选中要恢复的任务", parent=self.win)
+            messagebox.showinfo(_t("common.tip"),
+                                _t("trash.msg.select_restore"), parent=self.win)
             return
         t = self.store.get(sel[0])
         if t:
@@ -587,7 +604,8 @@ class ManagerWin:
             self._load_trash()
             self._load_list()
             self.on_save_cfg(self.cfg)
-            messagebox.showinfo("已恢复", f"任务「{t.title}」已恢复到任务列表",
+            messagebox.showinfo(_t("trash.msg.restored"),
+                                _t("trash.msg.restored_body", title=t.title),
                                 parent=self.win)
 
     def _purge_sel(self):
@@ -595,7 +613,8 @@ class ManagerWin:
         if not sel: return
         t = self.store.get(sel[0])
         if t and messagebox.askyesno(
-                "永久删除", f"将彻底删除「{t.title}」，此操作不可撤销，确认？",
+                _t("trash.msg.purge_title"),
+                _t("trash.msg.purge_body", title=t.title),
                 parent=self.win):
             self.store.purge(sel[0])
             self._load_trash()
@@ -603,10 +622,12 @@ class ManagerWin:
     def _purge_all(self):
         n = len(self.store.deleted())
         if n == 0:
-            messagebox.showinfo("提示", "回收站已经是空的", parent=self.win)
+            messagebox.showinfo(_t("common.tip"),
+                                _t("trash.msg.empty"), parent=self.win)
             return
         if messagebox.askyesno(
-                "清空回收站", f"将永久删除回收站中全部 {n} 条任务，此操作不可撤销，确认？",
+                _t("trash.msg.purge_all"),
+                _t("trash.msg.purge_all_body", n=n),
                 parent=self.win):
             self.store.purge_all_deleted()
             self._load_trash()
@@ -623,10 +644,7 @@ class ManagerWin:
         outer = tk.Frame(self.tab_cfg, bg=BG)
         outer.pack(fill="both", expand=True, padx=12, pady=10)
 
-        # ════════════════════════════════
-        # 左列：常规设置
-        # ════════════════════════════════
-        left = tk.LabelFrame(outer, text=" ⚙️ 常规设置 ", bg=BG, fg=ACC,
+        left = tk.LabelFrame(outer, text=_t("cfg.section.general"), bg=BG, fg=ACC,
                              font=("Microsoft YaHei UI", 10, "bold"),
                              relief="groove", bd=1, labelanchor="n")
         left.pack(side="left", fill="both", expand=True, padx=(0, 8), pady=0)
@@ -639,77 +657,84 @@ class ManagerWin:
         e_kw   = dict(bg=BG2, fg=FG, insertbackground="#fff",
                       relief="flat", font=("Microsoft YaHei UI", 11), width=26)
 
-        # 数据目录
-        tk.Label(frm, text="数据保存目录", **lbl_kw).grid(
+        tk.Label(frm, text=_t("cfg.data_dir"), **lbl_kw).grid(
             row=0, column=0, sticky="w", pady=5, padx=(0, 12))
         dir_f = tk.Frame(frm, bg=BG)
         dir_f.grid(row=0, column=1, sticky="w")
         self.e_datadir = tk.Entry(dir_f, **e_kw)
-        # 显示时用用户原始值（可能是相对路径"data"），这样视觉上就是相对路径
         self.e_datadir.insert(0, self.cfg.get("data_dir", "data"))
         self.e_datadir.pack(side="left")
-        _btn(dir_f, "浏览…", self._browse_dir,
+        _btn(dir_f, _t("common.browse"), self._browse_dir,
              font=("Microsoft YaHei UI", 9), padx=6).pack(side="left", padx=4)
-        # 小提示：当前生效的绝对路径
         import config as _cfg_mod
         _abs = _cfg_mod.ensure_data_dir(self.cfg)
-        tk.Label(frm, text=f"当前实际位置: {_abs}",
+        tk.Label(frm, text=_t("cfg.data_dir.hint", path=_abs),
                  bg=BG, fg="#666",
                  font=("Microsoft YaHei UI", 8)
                  ).grid(row=1, column=1, sticky="w", pady=(0, 4))
 
-        # 透明度
+        # 界面语言
+        tk.Label(frm, text=_t("cfg.language"), **lbl_kw).grid(
+            row=2, column=0, sticky="w", pady=5, padx=(0, 12))
+        lang_f = tk.Frame(frm, bg=BG)
+        lang_f.grid(row=2, column=1, sticky="w")
+        self._lang_options = i18n.lang_options()
+        self._lang_label_to_code = {label: code for code, label in self._lang_options}
+        cur_code = self.cfg.get("language", "zh_CN")
+        cur_label = next((lbl for code, lbl in self._lang_options if code == cur_code),
+                         self._lang_options[0][1])
+        self.lang_var = tk.StringVar(value=cur_label)
+        ttk.Combobox(lang_f, textvariable=self.lang_var,
+                     values=[lbl for _, lbl in self._lang_options],
+                     state="readonly", width=18,
+                     font=("Microsoft YaHei UI", 10)).pack(side="left")
+        tk.Label(lang_f, text=" " + _t("cfg.language.note"),
+                 bg=BG, fg="#666",
+                 font=("Microsoft YaHei UI", 8)).pack(side="left", padx=4)
+
         self.opacity_var = tk.DoubleVar(value=self.cfg.get("overlay_opacity", 0.90))
-        tk.Label(frm, text="悬浮窗透明度", **lbl_kw).grid(
-            row=1, column=0, sticky="w", pady=5, padx=(0, 12))
+        tk.Label(frm, text=_t("cfg.opacity"), **lbl_kw).grid(
+            row=3, column=0, sticky="w", pady=5, padx=(0, 12))
         tk.Scale(frm, from_=0.3, to=1.0, resolution=0.05, orient="horizontal",
                  variable=self.opacity_var, bg=BG, fg=FG, troughcolor=BG2,
-                 highlightthickness=0, length=180).grid(row=1, column=1, sticky="w")
+                 highlightthickness=0, length=180).grid(row=3, column=1, sticky="w")
 
-        # 字体大小
         self.fontsize_var = tk.IntVar(value=self.cfg.get("font_size", 11))
-        tk.Label(frm, text="字体大小", **lbl_kw).grid(
-            row=2, column=0, sticky="w", pady=5, padx=(0, 12))
+        tk.Label(frm, text=_t("cfg.font_size"), **lbl_kw).grid(
+            row=4, column=0, sticky="w", pady=5, padx=(0, 12))
         ttk.Spinbox(frm, from_=9, to=16, textvariable=self.fontsize_var,
                     width=5, font=("Microsoft YaHei UI", 10)
-                    ).grid(row=2, column=1, sticky="w")
+                    ).grid(row=4, column=1, sticky="w")
 
-        # 最多显示
         self.maxshow_var = tk.IntVar(value=self.cfg.get("max_display_tasks", 10))
-        tk.Label(frm, text="悬浮窗最多显示", **lbl_kw).grid(
-            row=3, column=0, sticky="w", pady=5, padx=(0, 12))
+        tk.Label(frm, text=_t("cfg.max_show"), **lbl_kw).grid(
+            row=5, column=0, sticky="w", pady=5, padx=(0, 12))
         ttk.Spinbox(frm, from_=3, to=30, textvariable=self.maxshow_var,
                     width=5, font=("Microsoft YaHei UI", 10)
-                    ).grid(row=3, column=1, sticky="w")
+                    ).grid(row=5, column=1, sticky="w")
 
-        # 始终置顶
         self.topmost_var = tk.BooleanVar(value=self.cfg.get("overlay_always_top", True))
-        tk.Label(frm, text="悬浮窗始终置顶", **lbl_kw).grid(
-            row=4, column=0, sticky="w", pady=5, padx=(0, 12))
-        tk.Checkbutton(frm, variable=self.topmost_var, bg=BG, fg=ACC,
-                       selectcolor=BG, activebackground=BG
-                       ).grid(row=4, column=1, sticky="w")
-
-        # 显示已完成
-        self.showdone_var = tk.BooleanVar(value=self.cfg.get("show_completed", False))
-        tk.Label(frm, text="悬浮窗显示已完成", **lbl_kw).grid(
-            row=5, column=0, sticky="w", pady=5, padx=(0, 12))
-        tk.Checkbutton(frm, variable=self.showdone_var, bg=BG, fg=ACC,
-                       selectcolor=BG, activebackground=BG
-                       ).grid(row=5, column=1, sticky="w")
-
-        # 开机自启
-        self.autostart_var = tk.BooleanVar(value=self.cfg.get("autostart", False))
-        tk.Label(frm, text="开机自启动", **lbl_kw).grid(
+        tk.Label(frm, text=_t("cfg.always_top"), **lbl_kw).grid(
             row=6, column=0, sticky="w", pady=5, padx=(0, 12))
-        tk.Checkbutton(frm, variable=self.autostart_var, bg=BG, fg=ACC,
+        tk.Checkbutton(frm, variable=self.topmost_var, bg=BG, fg=ACC,
                        selectcolor=BG, activebackground=BG
                        ).grid(row=6, column=1, sticky="w")
 
-        # ════════════════════════════════
-        # 右列：AI 配置
-        # ════════════════════════════════
-        right = tk.LabelFrame(outer, text=" 🤖 AI 配置 ", bg=BG, fg="#7c4dff",
+        self.showdone_var = tk.BooleanVar(value=self.cfg.get("show_completed", False))
+        tk.Label(frm, text=_t("cfg.show_done"), **lbl_kw).grid(
+            row=7, column=0, sticky="w", pady=5, padx=(0, 12))
+        tk.Checkbutton(frm, variable=self.showdone_var, bg=BG, fg=ACC,
+                       selectcolor=BG, activebackground=BG
+                       ).grid(row=7, column=1, sticky="w")
+
+        self.autostart_var = tk.BooleanVar(value=self.cfg.get("autostart", False))
+        tk.Label(frm, text=_t("cfg.autostart"), **lbl_kw).grid(
+            row=8, column=0, sticky="w", pady=5, padx=(0, 12))
+        tk.Checkbutton(frm, variable=self.autostart_var, bg=BG, fg=ACC,
+                       selectcolor=BG, activebackground=BG
+                       ).grid(row=8, column=1, sticky="w")
+
+        right = tk.LabelFrame(outer, text=_t("cfg.section.ai"), bg=BG, fg="#7c4dff",
                               font=("Microsoft YaHei UI", 10, "bold"),
                               relief="groove", bd=1, labelanchor="n")
         right.pack(side="right", fill="both", expand=True, padx=(8, 0), pady=0)
@@ -723,8 +748,7 @@ class ManagerWin:
         tip_f = tk.Frame(ai_frm, bg="#1a1a3e", bd=0)
         tip_f.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         tk.Label(tip_f,
-                 text="💡 开箱即用：已内置腾讯混元演示 Key，留空 API Key 即自动使用\n"
-                      "   其他选择：Groq 免费 / DeepSeek / Moonshot / OpenAI / 本地 Ollama",
+                 text=_t("cfg.ai.tip"),
                  bg="#1a1a3e", fg="#ffd54f",
                  font=("Microsoft YaHei UI", 9), justify="left",
                  wraplength=340).pack(padx=8, pady=6, anchor="w")
@@ -733,31 +757,28 @@ class ManagerWin:
         a_ent = dict(bg=BG2, fg=FG, insertbackground="#fff",
                      relief="flat", font=("Microsoft YaHei UI", 10))
 
-        # 优先使用 Ollama
         self.ai_ollama_var = tk.BooleanVar(
             value=ai_cfg.get("prefer_ollama", True))
-        tk.Label(ai_frm, text="优先使用本地 Ollama", **a_lbl).grid(
+        tk.Label(ai_frm, text=_t("cfg.ai.prefer_ollama"), **a_lbl).grid(
             row=1, column=0, sticky="w", pady=4)
         tk.Checkbutton(ai_frm, variable=self.ai_ollama_var, bg=BG, fg="#7c4dff",
                        selectcolor=BG, activebackground=BG
                        ).grid(row=1, column=1, sticky="w")
 
-        # Ollama 地址
-        tk.Label(ai_frm, text="Ollama 地址", **a_lbl).grid(
+        tk.Label(ai_frm, text=_t("cfg.ai.ollama_base"), **a_lbl).grid(
             row=2, column=0, sticky="w", pady=4)
         self.e_ollama_base = tk.Entry(ai_frm, width=28, **a_ent)
         self.e_ollama_base.insert(0, ai_cfg.get("ollama_base", "http://localhost:11434"))
         self.e_ollama_base.grid(row=2, column=1, sticky="w", pady=4)
 
-        # Ollama 模型
-        tk.Label(ai_frm, text="Ollama 模型", **a_lbl).grid(
+        tk.Label(ai_frm, text=_t("cfg.ai.ollama_model"), **a_lbl).grid(
             row=3, column=0, sticky="w", pady=4)
         ollama_model_f = tk.Frame(ai_frm, bg=BG)
         ollama_model_f.grid(row=3, column=1, sticky="w", pady=4)
         self.e_ollama_model = tk.Entry(ollama_model_f, width=18, **a_ent)
         self.e_ollama_model.insert(0, ai_cfg.get("ollama_model", "qwen2:7b"))
         self.e_ollama_model.pack(side="left")
-        _btn(ollama_model_f, "检测", self._detect_ollama,
+        _btn(ollama_model_f, _t("common.detect"), self._detect_ollama,
              font=("Microsoft YaHei UI", 9), padx=6).pack(side="left", padx=4)
 
         # 分隔线
@@ -766,13 +787,17 @@ class ManagerWin:
 
         # ── 云端 AI 服务商下拉（每个服务商独立 Key） ──────────
         # Provider 列表 & 当前 active_provider（供下方表单回填）
+        # provider 内部 id 与展示名称（展示名称会跟随语言变化）
+        _custom_label = "Custom" if i18n.current_lang() == "en_US" else "自定义"
+        _hunyuan_label = "Tencent Hunyuan" if i18n.current_lang() == "en_US" else "腾讯混元"
+        _groq_label = "Groq Free" if i18n.current_lang() == "en_US" else "Groq 免费"
         self._PROVIDERS = [
-            ("hunyuan",  "腾讯混元",   "https://api.hunyuan.cloud.tencent.com/v1", "hunyuan-turbos-latest"),
-            ("groq",     "Groq 免费",  "https://api.groq.com/openai/v1",           "llama3-8b-8192"),
-            ("deepseek", "DeepSeek",   "https://api.deepseek.com/v1",               "deepseek-chat"),
-            ("moonshot", "Moonshot",   "https://api.moonshot.cn/v1",                "moonshot-v1-8k"),
-            ("openai",   "OpenAI",     "https://api.openai.com/v1",                 "gpt-4o-mini"),
-            ("custom",   "自定义",     "",                                           ""),
+            ("hunyuan",  _hunyuan_label, "https://api.hunyuan.cloud.tencent.com/v1", "hunyuan-turbos-latest"),
+            ("groq",     _groq_label,    "https://api.groq.com/openai/v1",           "llama3-8b-8192"),
+            ("deepseek", "DeepSeek",     "https://api.deepseek.com/v1",               "deepseek-chat"),
+            ("moonshot", "Moonshot",     "https://api.moonshot.cn/v1",                "moonshot-v1-8k"),
+            ("openai",   "OpenAI",       "https://api.openai.com/v1",                 "gpt-4o-mini"),
+            ("custom",   _custom_label,  "",                                           ""),
         ]
         # 本地内存中的各 provider 配置副本（即时编辑，点"保存"才写盘）
         self._provider_state: dict = {}
@@ -790,8 +815,7 @@ class ManagerWin:
         if self._active_provider not in self._provider_state:
             self._active_provider = "hunyuan"
 
-        # 服务商下拉
-        tk.Label(ai_frm, text="云端服务商", **a_lbl).grid(
+        tk.Label(ai_frm, text=_t("cfg.ai.provider"), **a_lbl).grid(
             row=5, column=0, sticky="w", pady=4)
         self.ai_provider_var = tk.StringVar(
             value=self._provider_state[self._active_provider]["label"])
@@ -803,8 +827,7 @@ class ManagerWin:
         self.cmb_provider.grid(row=5, column=1, sticky="w", pady=4)
         self.cmb_provider.bind("<<ComboboxSelected>>", self._on_provider_change)
 
-        # API Key
-        tk.Label(ai_frm, text="API Key", **a_lbl).grid(
+        tk.Label(ai_frm, text=_t("cfg.ai.api_key"), **a_lbl).grid(
             row=6, column=0, sticky="w", pady=4)
         self.e_ai_key = tk.Entry(ai_frm, width=28, show="*", **a_ent)
         self.e_ai_key.grid(row=6, column=1, sticky="w", pady=4)
@@ -820,24 +843,21 @@ class ManagerWin:
         # Key 输入变化时实时写回内存副本（不落盘）
         self.e_ai_key.bind("<KeyRelease>", lambda _e: self._sync_form_to_state())
 
-        # Base URL
-        tk.Label(ai_frm, text="API Base URL", **a_lbl).grid(
+        tk.Label(ai_frm, text=_t("cfg.ai.base_url"), **a_lbl).grid(
             row=7, column=0, sticky="w", pady=4)
         self.e_ai_base = tk.Entry(ai_frm, width=28, **a_ent)
         self.e_ai_base.grid(row=7, column=1, sticky="w", pady=4)
         self.e_ai_base.bind("<KeyRelease>", lambda _e: self._sync_form_to_state())
 
-        # 模型
-        tk.Label(ai_frm, text="模型名称", **a_lbl).grid(
+        tk.Label(ai_frm, text=_t("cfg.ai.model"), **a_lbl).grid(
             row=8, column=0, sticky="w", pady=4)
         self.e_ai_model = tk.Entry(ai_frm, width=28, **a_ent)
         self.e_ai_model.grid(row=8, column=1, sticky="w", pady=4)
         self.e_ai_model.bind("<KeyRelease>", lambda _e: self._sync_form_to_state())
 
-        # 申请 Key 链接
         link_f = tk.Frame(ai_frm, bg=BG)
         link_f.grid(row=9, column=0, columnspan=3, sticky="w", pady=(4, 2))
-        tk.Label(link_f, text="💡 未配置 Key 时留空即可，混元会自动使用内置演示 Key",
+        tk.Label(link_f, text=_t("cfg.ai.note"),
                  bg=BG, fg="#ffd54f",
                  font=("Microsoft YaHei UI", 8), justify="left"
                  ).pack(anchor="w")
@@ -856,7 +876,7 @@ class ManagerWin:
         btn_row = tk.Frame(self.tab_cfg, bg=BG)
         btn_row.pack(fill="x", padx=16, pady=(0, 12))
 
-        _btn(btn_row, "💾 保存所有设置", self._save_cfg,
+        _btn(btn_row, _t("cfg.btn.save"), self._save_cfg,
              font=("Microsoft YaHei UI", 11, "bold"), padx=16, pady=6,
              bg="#0d7377", fg="#fff",
              activebackground="#14a085",
@@ -866,12 +886,11 @@ class ManagerWin:
                                     font=("Microsoft YaHei UI", 10))
         self.lbl_cfg_msg.pack(side="left", padx=12)
 
-    # ─── Ollama 检测 ──────────────────────────────────────────
     def _detect_ollama(self):
         import threading
         from ai_chat import OllamaBackend
         base = self.e_ollama_base.get().strip()
-        self.lbl_ai_status.config(text="⏳ 检测 Ollama 中…", fg=YELLOW)
+        self.lbl_ai_status.config(text=_t("cfg.ai.detect_pending"), fg=YELLOW)
         self.win.update()
 
         def _check():
@@ -879,15 +898,15 @@ class ManagerWin:
             models = OllamaBackend.list_models(base) if ok else []
             def _show():
                 if ok:
-                    models_str = ", ".join(models[:6]) or "（无模型）"
+                    models_str = ", ".join(models[:6]) or _t("cfg.ai.detect_no_models")
                     self.lbl_ai_status.config(
-                        text=f"✅ Ollama 在线，可用模型：{models_str}", fg=GREEN)
+                        text=_t("cfg.ai.detect_ok", models=models_str), fg=GREEN)
                     if models and not self.e_ollama_model.get().strip():
                         self.e_ollama_model.delete(0, "end")
                         self.e_ollama_model.insert(0, models[0])
                 else:
                     self.lbl_ai_status.config(
-                        text=f"❌ Ollama 未响应（{base}），请确认已启动", fg=RED)
+                        text=_t("cfg.ai.detect_fail", base=base), fg=RED)
             self.win.after(0, _show)
         threading.Thread(target=_check, daemon=True).start()
 
@@ -938,7 +957,8 @@ class ManagerWin:
     def _edit_sel(self):
         sel = self.tree.selection()
         if not sel:
-            messagebox.showinfo("提示","请先选中一条任务", parent=self.win)
+            messagebox.showinfo(_t("common.tip"),
+                                _t("manager.msg.select_first"), parent=self.win)
             return
         t = self.store.get(sel[0])
         if not t: return
@@ -959,8 +979,8 @@ class ManagerWin:
         if not sel: return
         t = self.store.get(sel[0])
         if t and messagebox.askyesno(
-                "移入回收站",
-                f"将任务「{t.title}」移入回收站（可恢复）？",
+                _t("manager.msg.trash_title"),
+                _t("manager.msg.trash_confirm", title=t.title),
                 parent=self.win):
             self.store.soft_delete(sel[0])
             self._load_list()
@@ -970,16 +990,19 @@ class ManagerWin:
     def _save_task(self):
         title = self.e_title.get().strip()
         if not title:
-            messagebox.showwarning("提示","任务标题不能为空", parent=self.win)
+            messagebox.showwarning(_t("common.tip"),
+                                   _t("edit.msg.empty_title"), parent=self.win)
             return
         alarm_t = self.e_alarm_time.get().strip()
         if alarm_t and not re.match(r"^\d{2}:\d{2}$", alarm_t):
-            messagebox.showwarning("提示","提醒时间格式应为 HH:MM", parent=self.win)
+            messagebox.showwarning(_t("common.tip"),
+                                   _t("edit.msg.bad_time"), parent=self.win)
             return
         alarm_d = self.e_alarm_date.get().strip()
-        if alarm_d in ("YYYY-MM-DD", ""): alarm_d = ""
+        if alarm_d in (_t("edit.placeholder.date"), "YYYY-MM-DD", ""): alarm_d = ""
         if alarm_d and not re.match(r"^\d{4}-\d{2}-\d{2}$", alarm_d):
-            messagebox.showwarning("提示","提醒日期格式应为 YYYY-MM-DD", parent=self.win)
+            messagebox.showwarning(_t("common.tip"),
+                                   _t("edit.msg.bad_date"), parent=self.win)
             return
 
         content = self.e_content.get("1.0","end-1c").strip()
@@ -1014,7 +1037,7 @@ class ManagerWin:
         self._edit_task = None
         self._load_list()
         self.on_save_cfg(self.cfg)
-        self.lbl_save_msg.config(text="✔ 已保存")
+        self.lbl_save_msg.config(text=_t("edit.msg.saved"))
         self.win.after(2000, lambda: self.lbl_save_msg.config(text=""))
         self._clear_form()
         self.nb.select(self.tab_list)
@@ -1025,19 +1048,19 @@ class ManagerWin:
         try:
             from markdown_editor import MarkdownEditor
         except Exception as e:
-            messagebox.showerror("错误",
-                                 f"无法加载 Markdown 编辑器：{e}",
+            messagebox.showerror(_t("common.error"),
+                                 _t("edit.msg.md_failed", e=e),
                                  parent=self.win)
             return
 
         cur = self.e_content.get("1.0", "end-1c")
-        title_hint = self.e_title.get().strip() or "任务内容"
+        title_hint = self.e_title.get().strip() or _t("edit.title.hint")
 
         def _on_save(new_text: str):
             self.e_content.delete("1.0", "end")
             self.e_content.insert("1.0", new_text)
             self.lbl_edit_hint.config(
-                text=f"  ✏️ 内容已从放大编辑器更新（{len(new_text)} 字符）",
+                text=_t("edit.msg.from_editor", n=len(new_text)),
                 fg=GREEN)
             self.win.after(2500,
                            lambda: self.lbl_edit_hint.config(fg=ACC))
@@ -1053,7 +1076,7 @@ class ManagerWin:
         MarkdownEditor.open(
             self.win,
             initial_text=cur,
-            title=f"📝 编辑任务内容 — {title_hint}",
+            title=_t("edit.window.title", hint=title_hint),
             on_save=_on_save,
             image_base_dir=self._image_base_dir(),
             on_screenshot=_on_screenshot,
@@ -1069,14 +1092,13 @@ class ManagerWin:
                 rel = Path(path).resolve().relative_to(base.resolve()).as_posix()
             except Exception:
                 rel = Path(path).as_posix()
-            snippet = f"\n![截图_{Path(path).stem}]({rel})\n"
-            # 插入到光标位置
+            snippet = f"\n![{_t('shot.alt_prefix')}{Path(path).stem}]({rel})\n"
             try:
                 self.e_content.insert("insert", snippet)
             except Exception:
                 self.e_content.insert("end", snippet)
             self.lbl_edit_hint.config(
-                text=f"  📷 已插入截图：{Path(path).name}", fg=GREEN)
+                text=_t("edit.msg.shot_inserted", name=Path(path).name), fg=GREEN)
             self.win.after(3000,
                            lambda: self.lbl_edit_hint.config(fg=ACC))
 
@@ -1094,9 +1116,8 @@ class ManagerWin:
             from screenshot import capture_and_edit
         except Exception as e:
             messagebox.showerror(
-                "截图不可用",
-                f"截图模块加载失败：{e}\n"
-                f"请确认已安装 Pillow: pip install pillow",
+                _t("edit.msg.shot_unavail"),
+                _t("edit.msg.shot_failed", e=e),
                 parent=self.win)
             if cb_insert:
                 cb_insert(None)
@@ -1128,7 +1149,7 @@ class ManagerWin:
         self.e_tags.delete(0,"end")
         self.e_alarm_time.delete(0,"end")
         self.e_alarm_date.delete(0,"end")
-        self.e_alarm_date.insert(0,"YYYY-MM-DD")
+        self.e_alarm_date.insert(0, _t("edit.placeholder.date"))
         self.pri_var.set(2)
         self.completed_var.set(False)
         self.progress_var.set(0)
@@ -1152,17 +1173,19 @@ class ManagerWin:
         self._update_progress_label(t.progress)
         self.completed_var.set(t.completed)
         elapsed = t.elapsed_days
-        elapsed_str = "今天创建" if elapsed==0 else f"已创建 {elapsed} 天"
+        elapsed_str = (_t("edit.msg.created_today") if elapsed == 0
+                       else _t("edit.msg.created_days", n=elapsed))
         self.lbl_times.config(
-            text=f"创建: {t.created_at}  更新: {t.updated_at}  {elapsed_str}")
+            text=_t("edit.msg.times_summary",
+                    c=t.created_at, u=t.updated_at, elapsed=elapsed_str))
         self.lbl_edit_hint.config(
-            text=f"  ✏️ 编辑中：{t.title}   (ID: {t.task_id})")
+            text=_t("edit.msg.editing", title=t.title, id=t.task_id))
 
     # ─── 设置 ─────────────────────────────────────────────────
     def _browse_dir(self):
         d = filedialog.askdirectory(parent=self.win,
                                     initialdir=self.e_datadir.get(),
-                                    title="选择数据保存目录")
+                                    title=_t("cfg.dialog.choose_dir"))
         if d:
             self.e_datadir.delete(0,"end")
             self.e_datadir.insert(0, d)
@@ -1175,6 +1198,10 @@ class ManagerWin:
         self.cfg["overlay_always_top"] = self.topmost_var.get()
         self.cfg["show_completed"]     = self.showdone_var.get()
         self.cfg["autostart"]          = self.autostart_var.get()
+        # 界面语言
+        new_lang = self._lang_label_to_code.get(
+            self.lang_var.get(), self.cfg.get("language", "zh_CN"))
+        self.cfg["language"]           = new_lang
         # AI 配置
         # 先把当前表单刷回内存副本，确保切换过但未切回的内容不丢
         self._sync_form_to_state()
@@ -1199,9 +1226,16 @@ class ManagerWin:
             "model":    "",
         }
         cfg_mod.save(self.cfg)
-        self.on_save_cfg(self.cfg)
-        self.lbl_cfg_msg.config(text="✔ 设置已保存")
-        self.win.after(2000, lambda: self.lbl_cfg_msg.config(text=""))
+        self.lbl_cfg_msg.config(text=_t("cfg.msg.saved"))
+        # 把回调放在最后调用，因为它可能销毁本窗口（语言切换）
+        self.win.after(50, lambda: self.on_save_cfg(self.cfg))
+        # 仅在窗口仍然存在的情况下调度清空提示文字
+        try:
+            self.win.after(2000,
+                           lambda: self.lbl_cfg_msg.winfo_exists()
+                           and self.lbl_cfg_msg.config(text=""))
+        except Exception:
+            pass
 
     def _close(self):
         self.win.destroy()
@@ -1218,11 +1252,7 @@ class ManagerWin:
         tip.pack(fill="x", pady=(0, 10))
         tk.Label(
             tip,
-            text=(
-                "💡 备份会把当前 任务列表 + AI 对话历史 + 配置（脱敏） 打包成单个 .zip 文件；\n"
-                "   可以直接导出到本地，也可以配置邮箱后一键发送到自己的邮箱，方便跨机器迁移。\n"
-                "   邮箱授权码 ≠ 登录密码，需要登录 QQ/163 邮箱后台单独开启并生成。"
-            ),
+            text=_t("bkp.tip"),
             bg="#1a1a3e", fg=YELLOW, justify="left",
             font=("Microsoft YaHei UI", 9), wraplength=900,
         ).pack(padx=10, pady=8, anchor="w")
@@ -1231,9 +1261,8 @@ class ManagerWin:
         top = tk.Frame(outer, bg=BG)
         top.pack(fill="x")
 
-        # 左：本地导出 / 导入
         left = tk.LabelFrame(
-            top, text=" 📦 本地备份 ", bg=BG, fg=ACC,
+            top, text=_t("bkp.section.local"), bg=BG, fg=ACC,
             font=("Microsoft YaHei UI", 10, "bold"),
             relief="groove", bd=1, labelanchor="n",
         )
@@ -1248,33 +1277,31 @@ class ManagerWin:
             value=bkp.get("include_config", True))
         tk.Checkbutton(
             lfrm, variable=self.bkp_inc_cfg_var,
-            text="  一并备份 config.json（API Key / 授权码将自动脱敏）",
+            text=_t("bkp.include_cfg"),
             bg=BG, fg=FG, selectcolor=BG, activebackground=BG,
             font=("Microsoft YaHei UI", 10), anchor="w",
         ).pack(fill="x", pady=(0, 10))
 
         btn_row = tk.Frame(lfrm, bg=BG)
         btn_row.pack(fill="x")
-        _btn(btn_row, "📤 导出到本地…", self._do_export_local,
+        _btn(btn_row, _t("bkp.btn.export"), self._do_export_local,
              font=("Microsoft YaHei UI", 10, "bold"),
              bg="#0d7377", fg="#fff",
              activebackground="#14a085", activeforeground="#fff",
              padx=14, pady=6).pack(side="left")
-        _btn(btn_row, "📥 从文件恢复…", self._do_import_local,
+        _btn(btn_row, _t("bkp.btn.import"), self._do_import_local,
              font=("Microsoft YaHei UI", 10), padx=12, pady=6
              ).pack(side="left", padx=8)
 
         tk.Label(
             lfrm,
-            text="💡 恢复时默认采用「合并」模式：已存在的任务/对话不会被覆盖，\n"
-                 "   只会追加本地缺失的条目，安全无损。",
+            text=_t("bkp.import_hint"),
             bg=BG, fg=FG_DIM, justify="left",
             font=("Microsoft YaHei UI", 9), wraplength=360,
         ).pack(fill="x", pady=(10, 0), anchor="w")
 
-        # 右：邮箱配置
         right = tk.LabelFrame(
-            top, text=" 📧 邮箱发送 ", bg=BG, fg=PURPLE,
+            top, text=_t("bkp.section.email"), bg=BG, fg=PURPLE,
             font=("Microsoft YaHei UI", 10, "bold"),
             relief="groove", bd=1, labelanchor="n",
         )
@@ -1291,7 +1318,7 @@ class ManagerWin:
         # SMTP 服务器预设按钮
         preset_f = tk.Frame(rfrm, bg=BG)
         preset_f.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
-        tk.Label(preset_f, text="快速选择：", bg=BG, fg=FG_DIM,
+        tk.Label(preset_f, text=_t("bkp.preset_label"), bg=BG, fg=FG_DIM,
                  font=("Microsoft YaHei UI", 9)).pack(side="left")
 
         try:
@@ -1310,28 +1337,25 @@ class ManagerWin:
                 cursor="hand2", activebackground=BG2,
             ).pack(side="left", padx=2)
 
-        # SMTP 服务器
-        tk.Label(rfrm, text="SMTP 服务器", **a_lbl).grid(
+        tk.Label(rfrm, text=_t("bkp.smtp_host"), **a_lbl).grid(
             row=1, column=0, sticky="w", pady=4)
         self.e_bkp_host = tk.Entry(rfrm, width=22, **a_ent)
         self.e_bkp_host.insert(0, bkp.get("smtp_host", "smtp.qq.com"))
         self.e_bkp_host.grid(row=1, column=1, sticky="w", pady=4)
-        tk.Label(rfrm, text="端口", **a_lbl).grid(
+        tk.Label(rfrm, text=_t("bkp.smtp_port"), **a_lbl).grid(
             row=1, column=2, sticky="e", padx=(8, 2))
         self.e_bkp_port = tk.Entry(rfrm, width=6, **a_ent)
         self.e_bkp_port.insert(0, str(bkp.get("smtp_port", 465)))
         self.e_bkp_port.grid(row=1, column=3, sticky="w", pady=4)
 
-        # 发件邮箱
-        tk.Label(rfrm, text="发件邮箱", **a_lbl).grid(
+        tk.Label(rfrm, text=_t("bkp.sender"), **a_lbl).grid(
             row=2, column=0, sticky="w", pady=4)
         self.e_bkp_sender = tk.Entry(rfrm, width=30, **a_ent)
         self.e_bkp_sender.insert(0, bkp.get("sender", ""))
         self.e_bkp_sender.grid(row=2, column=1, columnspan=3,
                                sticky="we", pady=4)
 
-        # 授权码
-        tk.Label(rfrm, text="授权码", **a_lbl).grid(
+        tk.Label(rfrm, text=_t("bkp.auth_code"), **a_lbl).grid(
             row=3, column=0, sticky="w", pady=4)
         self.e_bkp_auth = tk.Entry(rfrm, width=30, show="*", **a_ent)
         self.e_bkp_auth.insert(0, bkp.get("auth_code", ""))
@@ -1347,14 +1371,13 @@ class ManagerWin:
             font=("Segoe UI Emoji", 9), activebackground=BG,
         ).grid(row=3, column=3, padx=4)
 
-        # 收件邮箱
-        tk.Label(rfrm, text="收件邮箱", **a_lbl).grid(
+        tk.Label(rfrm, text=_t("bkp.recipient"), **a_lbl).grid(
             row=4, column=0, sticky="w", pady=4)
         self.e_bkp_to = tk.Entry(rfrm, width=30, **a_ent)
         self.e_bkp_to.insert(0, bkp.get("recipient", ""))
         self.e_bkp_to.grid(row=4, column=1, columnspan=3,
                            sticky="we", pady=4)
-        tk.Label(rfrm, text="（留空则发给自己）",
+        tk.Label(rfrm, text=_t("bkp.recipient.hint"),
                  bg=BG, fg=FG_DIM,
                  font=("Microsoft YaHei UI", 8)).grid(
             row=5, column=1, columnspan=3, sticky="w")
@@ -1364,10 +1387,10 @@ class ManagerWin:
         # 按钮行
         rbtn = tk.Frame(right, bg=BG)
         rbtn.pack(fill="x", padx=14, pady=(0, 12))
-        _btn(rbtn, "💾 保存邮箱配置", self._save_backup_cfg,
+        _btn(rbtn, _t("bkp.btn.save_email"), self._save_backup_cfg,
              font=("Microsoft YaHei UI", 10),
              padx=10, pady=5).pack(side="left")
-        _btn(rbtn, "📨 一键备份并发送邮箱", self._do_export_and_send,
+        _btn(rbtn, _t("bkp.btn.export_send"), self._do_export_and_send,
              font=("Microsoft YaHei UI", 10, "bold"),
              bg=PURPLE, fg="#fff",
              activebackground="#9575ff", activeforeground="#fff",
@@ -1375,7 +1398,7 @@ class ManagerWin:
 
         # ── 下部：日志输出 ───────────────────────────────────
         log_frm = tk.LabelFrame(
-            outer, text=" 📜 执行日志 ", bg=BG, fg=FG_DIM,
+            outer, text=_t("bkp.log.section"), bg=BG, fg=FG_DIM,
             font=("Microsoft YaHei UI", 9), relief="groove", bd=1,
         )
         log_frm.pack(fill="both", expand=True, pady=(12, 0))
@@ -1392,7 +1415,7 @@ class ManagerWin:
                            command=self.txt_bkp_log.yview)
         sb.pack(side="right", fill="y")
         self.txt_bkp_log.config(yscrollcommand=sb.set, state="disabled")
-        self._bkp_log("就绪。配置好邮箱后即可一键备份发送。")
+        self._bkp_log(_t("bkp.log.ready"))
 
     # ─── 备份 Tab 内部工具 ───────────────────────────────────
     def _bkp_log(self, msg: str):
@@ -1426,7 +1449,7 @@ class ManagerWin:
         self.cfg["backup"] = self._collect_backup_cfg()
         cfg_mod.save(self.cfg)
         self.on_save_cfg(self.cfg)
-        self._bkp_log("✔ 邮箱配置已保存")
+        self._bkp_log(_t("bkp.log.saved"))
 
     # ─── 导出到本地 ──────────────────────────────────────────
     def _do_export_local(self):
@@ -1438,11 +1461,12 @@ class ManagerWin:
 
         dest = filedialog.asksaveasfilename(
             parent=self.win,
-            title="保存备份文件",
+            title=_t("bkp.dialog.export"),
             defaultextension=".zip",
             initialdir=init_dir,
             initialfile=default_zip_name(),
-            filetypes=[("ZIP 备份", "*.zip"), ("所有文件", "*.*")],
+            filetypes=[(_t("bkp.dialog.zip_filter"), "*.zip"),
+                       (_t("bkp.dialog.all"), "*.*")],
         )
         if not dest:
             return
@@ -1453,19 +1477,19 @@ class ManagerWin:
                                  include_config=include_cfg,
                                  on_log=self._bkp_log)
         except Exception as e:
-            self._bkp_log(f"❌ 导出失败：{e}")
-            messagebox.showerror("导出失败", str(e), parent=self.win)
+            self._bkp_log(f"❌ {_t('bkp.msg.export_failed')}：{e}")
+            messagebox.showerror(_t("bkp.msg.export_failed"),
+                                 str(e), parent=self.win)
             return
 
-        # 记住目录
         self.cfg.setdefault("backup", {})["last_export_dir"] = str(
             Path(dest).parent)
         cfg_mod.save(self.cfg)
 
         messagebox.showinfo(
-            "导出成功",
-            f"已保存到：\n{dest}\n\n"
-            f"任务 {stat['tasks']} 条 · 对话 {stat['chats']} 个",
+            _t("bkp.msg.export_ok_title"),
+            _t("bkp.msg.export_ok",
+               path=dest, tasks=stat['tasks'], chats=stat['chats']),
             parent=self.win,
         )
 
@@ -1473,19 +1497,17 @@ class ManagerWin:
     def _do_import_local(self):
         src = filedialog.askopenfilename(
             parent=self.win,
-            title="选择备份文件",
-            filetypes=[("ZIP 备份", "*.zip"), ("所有文件", "*.*")],
+            title=_t("bkp.dialog.import"),
+            filetypes=[(_t("bkp.dialog.zip_filter"), "*.zip"),
+                       (_t("bkp.dialog.all"), "*.*")],
         )
         if not src:
             return
 
-        # 让用户选模式
         import tkinter.messagebox as mb
         res = mb.askyesnocancel(
-            "选择恢复模式",
-            "【是】合并恢复（推荐）：保留当前数据，只追加缺失条目\n"
-            "【否】覆盖恢复：清空现有对话并完全使用备份数据（危险）\n"
-            "【取消】放弃此次恢复",
+            _t("bkp.msg.choose_mode"),
+            _t("bkp.msg.choose_mode_body"),
             parent=self.win,
         )
         if res is None:
@@ -1494,8 +1516,8 @@ class ManagerWin:
 
         if not merge:
             if not mb.askyesno(
-                    "二次确认",
-                    "确定要覆盖现有对话历史吗？此操作不可撤销！",
+                    _t("bkp.msg.confirm_overwrite"),
+                    _t("bkp.msg.confirm_overwrite_body"),
                     parent=self.win):
                 return
 
@@ -1504,11 +1526,11 @@ class ManagerWin:
             stat = import_backup(src, self.cfg, merge=merge,
                                  on_log=self._bkp_log)
         except Exception as e:
-            self._bkp_log(f"❌ 恢复失败：{e}")
-            messagebox.showerror("恢复失败", str(e), parent=self.win)
+            self._bkp_log(f"❌ {_t('bkp.msg.import_failed')}：{e}")
+            messagebox.showerror(_t("bkp.msg.import_failed"), str(e),
+                                 parent=self.win)
             return
 
-        # 刷新任务列表（对话历史在 AI 窗口下次打开时自动加载）
         try:
             self.store.reload() if hasattr(self.store, "reload") else None
         except Exception:
@@ -1516,10 +1538,10 @@ class ManagerWin:
         self._load_list()
 
         messagebox.showinfo(
-            "恢复完成",
-            f"任务：新增 {stat['tasks_imported']} · 跳过 {stat['tasks_skipped']}\n"
-            f"对话：新增/更新 {stat['chats_imported']} · 跳过 {stat['chats_skipped']}\n\n"
-            "任务列表已刷新；AI 对话历史将在下次打开 AI 助手时生效。",
+            _t("bkp.msg.import_ok_title"),
+            _t("bkp.msg.import_ok_body",
+               ti=stat['tasks_imported'], ts=stat['tasks_skipped'],
+               ci=stat['chats_imported'], cs=stat['chats_skipped']),
             parent=self.win,
         )
 
@@ -1536,13 +1558,13 @@ class ManagerWin:
         missing = [k for k in ("smtp_host", "sender", "auth_code") if not smtp.get(k)]
         if missing:
             messagebox.showwarning(
-                "配置不完整",
-                f"请先填写：{'、'.join(missing)}",
+                _t("bkp.msg.cfg_missing"),
+                _t("bkp.msg.cfg_missing_body", fields="、".join(missing)),
                 parent=self.win,
             )
             return
 
-        self._bkp_log("🚀 开始一键备份并发送 …")
+        self._bkp_log(_t("bkp.msg.send_started"))
 
         def _worker():
             try:
@@ -1563,14 +1585,16 @@ class ManagerWin:
                     },
                     on_log=lambda m: self.win.after(0, self._bkp_log, m),
                 )
-                self.win.after(0, lambda: messagebox.showinfo(
-                    "发送成功",
-                    f"备份已发送到 {smtp['recipient'] or smtp['sender']}",
+                _to = smtp['recipient'] or smtp['sender']
+                self.win.after(0, lambda to=_to: messagebox.showinfo(
+                    _t("bkp.msg.send_ok_title"),
+                    _t("bkp.msg.send_ok_body", to=to),
                     parent=self.win))
             except Exception as e:
                 err = str(e)
-                self.win.after(0, self._bkp_log, f"❌ 失败：{err}")
+                self.win.after(0, self._bkp_log,
+                               f"❌ {_t('bkp.msg.send_failed')}：{err}")
                 self.win.after(0, lambda: messagebox.showerror(
-                    "发送失败", err, parent=self.win))
+                    _t("bkp.msg.send_failed"), err, parent=self.win))
 
         threading.Thread(target=_worker, daemon=True).start()
