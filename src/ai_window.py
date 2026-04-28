@@ -10,6 +10,7 @@ from datetime import datetime
 
 from ai_chat import ChatSession, build_backend, build_backend_for_provider
 from chat_history import HistoryStore
+from i18n import t as _t
 
 # ─── 配色 ──────────────────────────────────────────────────
 BG      = "#0d1117"
@@ -88,7 +89,7 @@ class AIChatWin:
     # ─── 窗口骨架 ─────────────────────────────────────────────
     def _build_win(self):
         w = self.win
-        w.title("🤖 AI 智能助手")
+        w.title(_t("ai.title"))
         w.geometry("1060x680")
         w.minsize(860, 540)
         w.configure(bg=BG)
@@ -108,7 +109,7 @@ class AIChatWin:
         top.pack(fill="x", side="top")
         top.pack_propagate(False)
 
-        tk.Label(top, text="🤖 AI 智能助手", bg=BG3, fg=ACC,
+        tk.Label(top, text=_t("ai.title"), bg=BG3, fg=ACC,
                  font=("Microsoft YaHei UI", 12, "bold")).pack(side="left", padx=12)
 
         self._lbl_backend = tk.Label(top, text="", bg=BG3, fg=FG_DIM, font=FONT_S)
@@ -121,19 +122,21 @@ class AIChatWin:
                              font=FONT_S, cursor="hand2",
                              activebackground=BG2, activeforeground=FG)
 
-        _btn("🔄 重建连接", self._rebuild_backend, fg=ACC).pack(side="right", padx=4)
+        _btn(_t("ai.btn.rebuild"), self._rebuild_backend, fg=ACC).pack(side="right", padx=4)
 
         # ── 模型切换下拉 ────────────────────────────────────
+        from i18n import current_lang as _cur_lang
+        _is_en = _cur_lang() == "en_US"
         self._MODEL_CHOICES = [
-            ("ollama",   "🟢 Ollama 本地"),
-            ("hunyuan",  "🐉 腾讯混元"),
-            ("groq",     "⚡ Groq 免费"),
+            ("ollama",   "🟢 " + ("Local Ollama"   if _is_en else "Ollama 本地")),
+            ("hunyuan",  "🐉 " + ("Tencent Hunyuan" if _is_en else "腾讯混元")),
+            ("groq",     "⚡ " + ("Groq Free"       if _is_en else "Groq 免费")),
             ("deepseek", "🔵 DeepSeek"),
             ("moonshot", "🌙 Moonshot"),
             ("openai",   "🤖 OpenAI"),
-            ("custom",   "🔧 自定义"),
+            ("custom",   "🔧 " + ("Custom"          if _is_en else "自定义")),
         ]
-        tk.Label(top, text="模型:", bg=BG3, fg=FG_DIM, font=FONT_S
+        tk.Label(top, text=_t("ai.label.model"), bg=BG3, fg=FG_DIM, font=FONT_S
                  ).pack(side="right", padx=(8, 2))
         self._model_var = tk.StringVar()
         self._cmb_model = ttk.Combobox(
@@ -191,13 +194,11 @@ class AIChatWin:
         self._session.backend = self._backend
         self._update_backend_label()
 
-        # 检查是否配置了 key（custom / 非混元且未配置时提醒）
         name = type(self._backend).__name__
         if name == "OfflineBackend":
-            self._add_sys_bubble(
-                f"⚠ 已切换到「{label}」，但尚未配置 API Key。请到「任务管家 → 设置 → AI 配置」填入。")
+            self._add_sys_bubble(_t("ai.switched.no_key", label=label))
         else:
-            self._add_sys_bubble(f"✅ 已切换到「{label}」")
+            self._add_sys_bubble(_t("ai.switched", label=label))
 
     # ─── 左侧历史侧边栏 ───────────────────────────────────────
     def _build_sidebar(self, parent):
@@ -208,10 +209,10 @@ class AIChatWin:
         head = tk.Frame(side, bg=BG_SIDE)
         head.pack(fill="x", padx=8, pady=(10, 6))
 
-        tk.Label(head, text="历史对话", bg=BG_SIDE, fg=FG,
+        tk.Label(head, text=_t("ai.history"), bg=BG_SIDE, fg=FG,
                  font=("Microsoft YaHei UI", 11, "bold")).pack(side="left")
 
-        tk.Button(head, text="＋ 新建",
+        tk.Button(head, text=_t("ai.btn.new"),
                   command=self._new_chat,
                   bg=ACC, fg="#0d1117", relief="flat",
                   font=FONT_S, padx=10, pady=2, cursor="hand2",
@@ -251,7 +252,7 @@ class AIChatWin:
 
         # 底部说明
         tk.Label(side,
-                 text="对话自动保存至：\ndata/chat_history/",
+                 text=_t("ai.history.saved_to"),
                  bg=BG_SIDE, fg=FG_DIM2, font=FONT_XS, justify="left"
                  ).pack(side="bottom", padx=8, pady=(0, 8), anchor="w")
 
@@ -264,7 +265,7 @@ class AIChatWin:
         status = tk.Frame(right, bg=BG, height=22)
         status.pack(side="bottom", fill="x")
         status.pack_propagate(False)
-        self._lbl_status = tk.Label(status, text="就绪", bg=BG, fg=FG_DIM,
+        self._lbl_status = tk.Label(status, text=_t("ai.status.ready"), bg=BG, fg=FG_DIM,
                                     font=FONT_S, anchor="w")
         self._lbl_status.pack(fill="x", padx=12)
 
@@ -296,7 +297,7 @@ class AIChatWin:
         btn_col.pack_propagate(False)
 
         self._btn_send = tk.Button(
-            btn_col, text="发送 ⏎",
+            btn_col, text=_t("ai.btn.send"),
             command=self._send,
             bg=ACC, fg="#0d1117",
             relief="flat",
@@ -306,22 +307,21 @@ class AIChatWin:
         )
         self._btn_send.pack(fill="both", expand=True)
 
-        tk.Label(btn_col, text="Shift+Enter 换行",
+        tk.Label(btn_col, text=_t("ai.hint.shift_enter"),
                  bg=BG2, fg=FG_DIM2, font=FONT_XS).pack(pady=(4, 0))
 
-        # 快捷提示
         hint_frame = tk.Frame(right, bg=BG, height=36)
         hint_frame.pack(side="bottom", fill="x", padx=8)
         hint_frame.pack_propagate(False)
 
-        tk.Label(hint_frame, text="💡 示例提问（可自由输入任何问题）：",
+        tk.Label(hint_frame, text=_t("ai.hint.examples"),
                  bg=BG, fg=FG_DIM, font=FONT_XS).pack(side="left", padx=(4, 6))
 
         HINTS = [
-            ("今日任务建议",  "请帮我分析当前任务的优先级，给出今日工作安排建议"),
-            ("时间规划",      "如何合理规划每天的时间，提升工作效率？"),
-            ("目标拆解",      "帮我把一个大目标拆解为可执行的小步骤"),
-            ("效率技巧",      "推荐几个提升个人效率的实用方法"),
+            (_t("ai.hint.today_tasks"), _t("ai.hint.today_tasks.msg")),
+            (_t("ai.hint.time"),        _t("ai.hint.time.msg")),
+            (_t("ai.hint.goal"),        _t("ai.hint.goal.msg")),
+            (_t("ai.hint.tips"),        _t("ai.hint.tips.msg")),
         ]
         for txt, msg in HINTS:
             tk.Button(
@@ -395,13 +395,13 @@ class AIChatWin:
         b = self._backend
         name = type(b).__name__
         if name == "OllamaBackend":
-            txt, color = f"🟢 Ollama 本地 · {b.model}", "#3fb950"
+            txt, color = _t("ai.bk.ollama", m=b.model), "#3fb950"
         elif name == "OpenAICompatBackend":
             display = getattr(b, "label", None) \
                       or b.base.replace("https://", "").split("/")[0]
-            txt, color = f"🔵 {display} · {b.model}", ACC
+            txt, color = _t("ai.bk.cloud", disp=display, m=b.model), ACC
         else:
-            txt, color = "⚫ 离线模式（未配置）", FG_DIM
+            txt, color = _t("ai.bk.offline"), FG_DIM
         self._lbl_backend.config(text=txt, fg=color)
 
     def _maybe_rebuild_backend(self, new_cfg: dict):
@@ -417,7 +417,7 @@ class AIChatWin:
         self._backend = build_backend(self.cfg)
         self._session.backend = self._backend
         self._update_backend_label()
-        self._add_sys_bubble("✅ 已重建 AI 连接")
+        self._add_sys_bubble(_t("ai.rebuilt"))
 
     # ─── 气泡渲染 ─────────────────────────────────────────────
     def _text_line_count(self, text_widget, bubble_width_chars):
@@ -480,17 +480,17 @@ class AIChatWin:
         if role == "user":
             bg_b, fg_b = BUBBLE_USER_BG, BUBBLE_USER_FG
             anchor, side = "e", "right"
-            nick = "👤 你"
+            nick = _t("ai.label.you")
             nick_color = ACC
         elif role == "assistant":
             bg_b, fg_b = BUBBLE_AI_BG, BUBBLE_AI_FG
             anchor, side = "w", "left"
-            nick = f"🤖 AI{'  ·  ' + model_label if model_label else ''}"
+            nick = _t("ai.label.ai") + (f"  ·  {model_label}" if model_label else "")
             nick_color = ACC2
         elif role == "error":
             bg_b, fg_b = BUBBLE_ERR_BG, BUBBLE_ERR_FG
             anchor, side = "w", "left"
-            nick = "❌ 错误"
+            nick = _t("ai.label.error")
             nick_color = RED
         else:   # system
             bg_b, fg_b = BUBBLE_SYS_BG, BUBBLE_SYS_FG
@@ -547,11 +547,11 @@ class AIChatWin:
         # 右键菜单（复制 / 复制整条）
         menu = tk.Menu(txt, tearoff=0, bg=BG3, fg=FG,
                        activebackground=ACC, activeforeground="#0d1117")
-        menu.add_command(label="复制选中", command=_copy_selection)
+        menu.add_command(label=_t("common.copy_selection"), command=_copy_selection)
         def _copy_all(w=txt):
             self.win.clipboard_clear()
             self.win.clipboard_append(w.get("1.0", "end-1c"))
-        menu.add_command(label="复制整条", command=_copy_all)
+        menu.add_command(label=_t("common.copy_all"), command=_copy_all)
         def _popup(event, m=menu):
             m.tk_popup(event.x_root, event.y_root)
         txt.bind("<Button-3>", _popup)
@@ -632,18 +632,13 @@ class AIChatWin:
         b = self._backend
         name = type(b).__name__
         if name == "OllamaBackend":
-            mode = f"已连接本地 Ollama（{b.model}）"
+            mode = _t("ai.welcome.ollama", m=b.model)
         elif name == "OpenAICompatBackend":
-            display = getattr(b, "label", None) or "云端 API"
-            mode = f"已连接 {display}（{b.model}）"
+            display = getattr(b, "label", None) or _t("ai.bk.cloud", disp="API", m="").rstrip(" ·")
+            mode = _t("ai.welcome.cloud", label=display, m=b.model)
         else:
-            mode = "当前为离线模式，请在「设置 → AI 配置」填写 API Key"
-        welcome = (
-            "欢迎使用 AI 智能助手 🤖\n"
-            f"当前模式：{mode}\n"
-            "💬 Enter 发送 / Shift+Enter 换行 · 对话自动保存到 data/chat_history/"
-        )
-        self._add_sys_bubble(welcome)
+            mode = _t("ai.welcome.offline")
+        self._add_sys_bubble(_t("ai.welcome.full", mode=mode))
 
     # ─── 历史侧边栏 ───────────────────────────────────────────
     def _refresh_history_list(self):
@@ -653,7 +648,7 @@ class AIChatWin:
         sessions = self._history.list_sessions()
         if not sessions:
             tk.Label(self._side_inner,
-                     text="（暂无历史对话）\n开始聊天后会自动保存",
+                     text=_t("ai.history.empty"),
                      bg=BG_SIDE, fg=FG_DIM2, font=FONT_XS, justify="left"
                      ).pack(pady=10, padx=6, anchor="w")
             return
@@ -667,7 +662,7 @@ class AIChatWin:
         item = tk.Frame(self._side_inner, bg=bg_item, cursor="hand2")
         item.pack(fill="x", padx=2, pady=2)
 
-        title = s["title"] or "新对话"
+        title = s["title"] or _t("common.untitled")
         if len(title) > 20:
             title = title[:20] + "…"
 
@@ -677,7 +672,7 @@ class AIChatWin:
                              font=FONT_SIDE, anchor="w", justify="left")
         lbl_title.pack(fill="x", padx=8, pady=(6, 0), anchor="w")
 
-        meta_txt = f"{ts}  ·  {s.get('msg_count', 0)} 条"
+        meta_txt = _t("ai.history.entry_count", ts=ts, n=s.get('msg_count', 0))
         lbl_meta = tk.Label(item, text=meta_txt, bg=bg_item, fg=FG_DIM2,
                             font=FONT_XS, anchor="w")
         lbl_meta.pack(fill="x", padx=8, pady=(0, 6), anchor="w")
@@ -691,8 +686,8 @@ class AIChatWin:
 
         def _delete(event=None, sid=s["session_id"], title=s["title"]):
             if messagebox.askyesno(
-                "删除对话",
-                f"确定删除对话「{title[:20]}」？\n此操作不可恢复。",
+                _t("ai.history.delete_title"),
+                _t("ai.history.delete_body", title=title[:20]),
                 parent=self.win,
             ):
                 self._history.delete(sid)
@@ -728,7 +723,7 @@ class AIChatWin:
     # ─── 新建会话 ─────────────────────────────────────────────
     def _new_chat(self):
         if self._thinking:
-            messagebox.showinfo("稍候", "AI 正在回复，请等待完成后再新建对话",
+            messagebox.showinfo(_t("common.tip"), _t("ai.history.wait_new"),
                                 parent=self.win)
             return
         self._session.clear()
@@ -737,17 +732,16 @@ class AIChatWin:
         self._clear_chat_area()
         self._show_welcome()
         self._refresh_history_list()
-        self._lbl_status.config(text="已新建对话")
+        self._lbl_status.config(text=_t("ai.history.new_done"))
 
-    # ─── 加载历史 ─────────────────────────────────────────────
     def _load_history(self, session_id: str):
         if self._thinking:
-            messagebox.showinfo("稍候", "AI 正在回复，请等待完成后再切换对话",
+            messagebox.showinfo(_t("common.tip"), _t("ai.history.wait_thinking"),
                                 parent=self.win)
             return
         rec = self._history.load(session_id)
         if not rec:
-            messagebox.showerror("错误", "对话文件读取失败", parent=self.win)
+            messagebox.showerror(_t("common.error"), _t("ai.history.read_failed"), parent=self.win)
             return
 
         self._session.clear()
@@ -765,11 +759,14 @@ class AIChatWin:
         # 渲染
         self._clear_chat_area()
         self._bulk_loading = True
-        self._add_sys_bubble(
-            f"📂 已载入历史对话：{rec.get('title', '')}\n"
-            f"创建 {rec.get('created_at', '')}  ·  更新 {rec.get('updated_at', '')}  ·  "
-            f"{rec.get('label', '')} / {rec.get('model', '')}"
-        )
+        self._add_sys_bubble(_t(
+            "ai.history.loaded",
+            title=rec.get("title", ""),
+            c=rec.get("created_at", ""),
+            u=rec.get("updated_at", ""),
+            label=rec.get("label", ""),
+            model=rec.get("model", ""),
+        ))
         for m in rec.get("messages", []):
             t = (m.get("time") or "")[11:16]
             role = m.get("role")
@@ -808,7 +805,7 @@ class AIChatWin:
         self.win.after(300, _finalize)
 
         self._refresh_history_list()
-        self._lbl_status.config(text=f"已载入：{rec.get('title', '')}")
+        self._lbl_status.config(text=_t("ai.history.loaded_status", title=rec.get('title', '')))
 
     # ─── 发送消息 ─────────────────────────────────────────────
     def _on_enter(self, event):
@@ -845,8 +842,8 @@ class AIChatWin:
         self._cur_ai_bubble = {"text": ai_txt, "buf": ""}
 
         self._thinking = True
-        self._btn_send.config(state="disabled", text="⏳ 思考中")
-        self._lbl_status.config(text="AI 正在思考中…")
+        self._btn_send.config(state="disabled", text=_t("ai.btn.thinking"))
+        self._lbl_status.config(text=_t("ai.status.thinking"))
 
         def _append_to_ai(tok: str):
             self._cur_ai_bubble["buf"] += tok
@@ -869,8 +866,8 @@ class AIChatWin:
         def on_done(full: str):
             def _finish():
                 self._thinking = False
-                self._btn_send.config(state="normal", text="发送 ⏎")
-                self._lbl_status.config(text=f"回复完成 · {len(full)} 字  ·  已保存")
+                self._btn_send.config(state="normal", text=_t("ai.btn.send"))
+                self._lbl_status.config(text=_t("ai.status.done", n=len(full)))
                 self._cur_ai_bubble = None
                 # 持久化：AI 回复
                 try:
@@ -885,8 +882,8 @@ class AIChatWin:
             def _show():
                 self._make_bubble("error", err)
                 self._thinking = False
-                self._btn_send.config(state="normal", text="发送 ⏎")
-                self._lbl_status.config(text="发送失败，请检查配置")
+                self._btn_send.config(state="normal", text=_t("ai.btn.send"))
+                self._lbl_status.config(text=_t("ai.status.failed"))
                 self._cur_ai_bubble = None
                 try:
                     self._history.append(self._cur_record, "assistant",
