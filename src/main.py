@@ -18,6 +18,8 @@ from overlay import Overlay
 from manager import ManagerWin
 from ai_window import AIChatWin
 import alarm
+import i18n
+from i18n import t
 
 # ── 全局状态 ──────────────────────────────────────────────────
 _manager_win = None
@@ -64,19 +66,21 @@ def _start_tray():
             _root.after(0, _quit_app)
 
         menu = pystray.Menu(
-            pystray.MenuItem("📋 打开管理器", _show_mgr, default=True),
-            pystray.MenuItem("🤖 AI 问答",    _open_ai_tray),
-            pystray.MenuItem("📷 截图",        _shot_tray),
-            pystray.MenuItem("👁 显示/隐藏悬浮窗", _toggle_overlay),
+            pystray.MenuItem(t("tray.open_manager"),   _show_mgr, default=True),
+            pystray.MenuItem(t("tray.ai"),             _open_ai_tray),
+            pystray.MenuItem(t("tray.shot"),           _shot_tray),
+            pystray.MenuItem(t("tray.toggle_overlay"), _toggle_overlay),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("❌ 退出", _quit),
+            pystray.MenuItem(t("tray.quit"), _quit),
         )
         _tray_icon = pystray.Icon("TaskManager", _icon_img(),
-                                  "桌面任务管家", menu)
-        t = threading.Thread(target=_tray_icon.run, daemon=True)
-        t.start()
+                                  t("common.app_name"), menu)
+        _thr = threading.Thread(target=_tray_icon.run, daemon=True)
+        _thr.start()
     except ImportError:
         pass    # 没有 pystray / PIL，跳过托盘
+    except Exception as e:
+        print(f"[tray] 启动托盘失败（已忽略）: {e}")
 
 
 # ──────────────────────────────────────────────────────────────
@@ -122,19 +126,19 @@ def _quick_screenshot():
                 base = save_root
                 from pathlib import Path
                 rel = Path(path).resolve().relative_to(base.resolve()).as_posix()
-                snippet = f"\n![截图_{Path(path).stem}]({rel})\n"
+                snippet = f"\n![{t('shot.alt_prefix')}{Path(path).stem}]({rel})\n"
                 _manager_win.e_content.insert("insert", snippet)
                 _manager_win.win.lift()
                 _manager_win.lbl_edit_hint.config(
-                    text=f"  📷 已插入截图：{Path(path).name}", fg="#66bb6a")
+                    text=t("edit.msg.shot_inserted", name=Path(path).name),
+                    fg="#66bb6a")
                 return
             except Exception as e:
                 print(f"[screenshot] 插入失败，已仅保存到 {path}: {e}")
-        # 否则只提示保存位置
         try:
             from tkinter import messagebox
-            messagebox.showinfo("截图已保存",
-                                f"已保存到：\n{path}",
+            messagebox.showinfo(t("shot.toast.saved"),
+                                t("shot.toast.saved_body", path=path),
                                 parent=_root)
         except Exception:
             pass
@@ -162,20 +166,57 @@ def _start_global_hotkey():
 
 
 def _on_cfg_saved(new_cfg: dict):
-    """配置保存后的回调：同步自启动 + 刷新悬浮窗 + 重建AI后端"""
-    global _cfg
+    """配置保存后的回调：同步自启动 + 刷新悬浮窗 + 重建AI后端 + 切换语言"""
+    global _cfg, _manager_win
+    old_lang = i18n.current_lang()
     _cfg = new_cfg
     cfg_mod.save(_cfg)
     autostart.sync(_cfg.get("autostart", False))
+
+    new_lang = _cfg.get("language", "zh_CN")
+    lang_changed = (new_lang != old_lang)
+    if lang_changed:
+        i18n.set_lang(new_lang)
+
     if _overlay:
         _overlay.update_cfg(_cfg)
-    # 如果数据目录变了，重新加载任务
     _store.reload(_cfg)
-    if _overlay:
-        _overlay.refresh()
-    if _manager_win and _manager_win.win.winfo_exists():
-        _manager_win._load_list()
-    # 通知 AI 窗口更新后端
+
+    if lang_changed:
+        # 重建悬浮窗 / 管理器 / AI 窗口以应用新语言
+        try:
+            if _overlay:
+                _overlay.rebuild_ui()
+        except Exception as e:
+            print(f"[i18n] overlay 重建失败: {e}")
+        try:
+            if _manager_win and _manager_win.win.winfo_exists():
+                _manager_win.win.destroy()
+                _manager_win = None
+                _root.after(120, _open_manager)
+        except Exception as e:
+            print(f"[i18n] manager 重建失败: {e}")
+        try:
+            if AIChatWin._instance and AIChatWin._instance.win.winfo_exists():
+                AIChatWin._instance.win.destroy()
+                AIChatWin._instance = None
+        except Exception as e:
+            print(f"[i18n] ai window 重建失败: {e}")
+        # 重启托盘以更新菜单语言
+        try:
+            global _tray_icon
+            if _tray_icon is not None:
+                _tray_icon.stop()
+                _tray_icon = None
+                _start_tray()
+        except Exception as e:
+            print(f"[i18n] tray 重建失败: {e}")
+    else:
+        if _overlay:
+            _overlay.refresh()
+        if _manager_win and _manager_win.win.winfo_exists():
+            _manager_win._load_list()
+
     if AIChatWin._instance and AIChatWin._instance.win.winfo_exists():
         AIChatWin._instance._maybe_rebuild_backend(_cfg)
 
@@ -202,43 +243,33 @@ def _quit_app():
 def main():
     global _root, _cfg, _store, _overlay
 
-    # 在 Tk 初始化前打开 DPI 感知，截图坐标才会正确
     try:
-        from screenshot import _enable_dpi_awareness
-        _enable_dpi_awareness()
+        from platform_utils import enable_dpi_awareness
+        enable_dpi_awareness()
     except Exception:
         pass
 
+    _cfg = cfg_mod.load()
+    i18n.set_lang(_cfg.get("language", "zh_CN"))
+
     _root = tk.Tk()
     _root.withdraw()
-    _root.title("桌面任务管家")
+    _root.title(t("common.app_name"))
 
-    # 加载配置 & 数据
-    _cfg = cfg_mod.load()
     cfg_mod.ensure_data_dir(_cfg)
     _store = Store(_cfg)
 
-    # 同步自启动注册表
     autostart.sync(_cfg.get("autostart", False))
 
-    # 悬浮窗（传入 quit 回调 + AI 回调 + 截图回调）
     _overlay = Overlay(_root, _cfg, _store, _open_manager,
                        quit_cb=_quit_app, open_ai_cb=_open_ai,
                        screenshot_cb=_quick_screenshot)
 
-    # 系统托盘（可选）
     _start_tray()
-
-    # 全局热键 Ctrl+Alt+A → 截图（可选）
     _start_global_hotkey()
 
-    # 绑定主窗口关闭
     _root.protocol("WM_DELETE_WINDOW", _quit_app)
-
-    # 启动闹钟轮询
     _root.after(5000, _check_alarms)
-
-    # 首次启动打开管理器
     _root.after(300, _open_manager)
 
     _root.mainloop()
