@@ -1,9 +1,11 @@
 {
   "_comment_": "复制本文件为 config/config.json 并填入你自己的 API Key 后使用；本文件仅作模板，不要填真实 Key",
   "data_dir": "data",
+  "language": "zh_CN",
   "overlay_x": 20,
   "overlay_y": 100,
   "overlay_width": 280,
+  "overlay_height": 600,
   "overlay_opacity": 0.9,
   "overlay_always_top": true,
   "overlay_visible": true,
